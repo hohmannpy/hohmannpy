@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 
 
 class KeplerPropagator(base.Propagator):
-    """
-    Propagates orbits using an f and g series of Kepler's equation.
+    r"""
+    Propagates orbits using an f and g functions as well as Kepler's equation.
 
     If eccentricity is greater than 1 automatically switches over to using the hyperbolic eccentric anomaly. The
     parabolic case is not included. Be aware that for near-parabolic orbits propagation accuracy will greatly decrease.
@@ -58,7 +58,7 @@ class KeplerPropagator(base.Propagator):
             runtime: float,
             perturbing_forces: list[perturbations.Perturbation] = None
     ):
-        """
+        r"""
         Perform orbit propagation using Kepler's method.
 
         Parameters
@@ -210,6 +210,7 @@ class KeplerPropagator(base.Propagator):
                                 * (1 - np.cosh(orbit.eccentric_anomaly - initial_eccentric_anomalies[name]))
                         )
 
+                # Compute the new velocity.
                 orbit.velocity = (
                         fdot_func * initial_positions[name] + gdot_func * initial_velocities[name]
                 )
@@ -218,7 +219,7 @@ class KeplerPropagator(base.Propagator):
             self.log(timestep)
 
     def gauss_equation(self, eccentricity: float, true_anomaly: float) -> float:
-        """
+        r"""
         Converts true anomaly to eccentric anomaly.
 
         Parameters
@@ -255,11 +256,11 @@ class KeplerPropagator(base.Propagator):
             initial_guess: float,
             initial_time: float,
     ) -> float:
-        """
+        r"""
         Function used to compute the new eccentric anomaly given the current eccentric anomaly and the desired time
         increment.
 
-        Kepler's equation is transcendental wrt. eccentric anomaly so root-finding via sp.optimize.newton()
+        Kepler's equation is transcendental wrt. eccentric anomaly so root-finding via :func:`scipy.optimize.newton()`
         is used to solve for it. The ideal initial guess is just the eccentric anomaly on the previous timestep.
 
         Parameters

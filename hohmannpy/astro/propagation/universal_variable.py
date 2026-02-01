@@ -11,27 +11,31 @@ if TYPE_CHECKING:
 
 
 class UniversalVariablePropagator(base.Propagator):
-    """
-    Propagator which uses the universal variable formulation of Kepler's equation along with f and g series. This makes
-    use of the titular "universal variable" along with special functions known as Stumpff series to handle propagation
-    for the elliptical, hyperbolic, and parabolic cases seamlessly by switching between different definitions of said
-    series.
+    r"""
+    Propagates orbits using an f and g functions as well as a universal variable formulation of Kepler's equation.
 
-    NOTE: In practice near-parabolic cases are handled equivalently to parabolic cases based on a tolerance set by the
-    user. There is a loss in accuracy for these orbits based on how many terms in the Stumpff series are evaluated in
-    these cases.
+    Unlike with the standard form of Kepler's equation the inclusion of the universal variable allows propagation of
+    parabolic orbits in addition to elliptical and hyperbolic ones.
 
-    :ivar fg_constraint: Whether to compute the gdot-series independently (increasing computation time) or to instead
-        use the series constraint (faster but less accurate).
-    :ivar solver_tol: Tolerance to use when solving Kepler's equation.
-    :ivar stumpff_tol: Minimum absolute value of the Stumpff parameter before switching to the infinite series
-        definition of the Stumpff series.
-    :ivar stumpff_series_length: How many terms to evaluate in the Stumpff series when using their infinite series
-        definitions.
-
-    [PROPAGATION METHOD PARAMETERS]
-    :ivar universal_variable:
-    :ivar stumpff_param:
+    Parameters
+    ----------
+    step_size : float
+        Time interval between propagation steps. If one is not provided by the user it will be set in ``propagate()`` to
+        60 :math:`s`.
+    solver_tol: float
+        Error tolerance when performing root-finding to solver Kepler's equation.
+    fg_constraint: bool
+        Flag which indicates whether to compute the derivative of the g function (``False``) or to use a constraint to
+        eliminate it (``True``).
+    stumpff_tol: float
+        The universal variable is not an angular quantity, so it is used to compute a variable known as the Stumpff
+        parameter whose root is an angle. The Stumpff parameter is used to compute two hypergeometric series, termed as
+        Stumpff series, from which the f and g functions may be assembled. For most values of the Stumpff parameter
+        these series converge absolutely to either trigonometric or hyper-trigonometric functions, but when it is small
+        the Stumpff series must be computed via summation. "Small" is defined here as the absolute value of the Stumpff
+        parameter being under ``stumpff_tol``.
+    stumpff_series_length : int
+        When the Stumpff series are computed via summation, how many terms to include.
     """
 
     def __init__(
@@ -59,20 +63,15 @@ class UniversalVariablePropagator(base.Propagator):
             final_time: float,
             perturbing_forces: list[perturbations.Perturbation] = None
     ):
-        """
-        The procedure for this style of propagation is as follows:
-            1) Save initial position and velocity as well as the initial universal variable.
-            2) Compute the new universal variable on the next time step from Kepler's equation. This involves computing
-                the Stumpff series
-            3) Recompute the Stumpff series using the new universal variable for use in computing the f and g functions.
-            4) Form the f and g functions and use them to compute the new position.
-            5) Form the fdot and gdot functions and use them and the new position to compute the new velocity.
-            6) Repeat 2-5 until the final time is reached.
+        r"""
+        Perform orbit propagation using the universal variable form of Kepler's method.
         """
 
         super().propagate(satellites, final_time, perturbing_forces)
 
-        # Get initial values used for propagation and set up logging capabilities.
+        # Get initial values used for propagation and set up logging capabilities. This involves iterating through each
+        # satellite and extracting attributes of their orbits. Like the satellites themselves these are stored as
+        # dictionaries where the satellite name is the key and the property itself is the value.
         initial_times = {}
         initial_positions = {}
         initial_velocities = {}
@@ -82,18 +81,28 @@ class UniversalVariablePropagator(base.Propagator):
             initial_positions[name] = satellite.orbit.position.copy()
             initial_velocities[name] = satellite.orbit.velocity.copy()
 
+            # Conveniently, both the universal variable and Stumpff parameter start at 0.
             satellite.orbit.universal_variable = 0  # Needed for logging purposes.
             satellite.orbit.stumpff_param = 0
+
+            # For parabolic orbits the semi-major axis is infinite so in order for the solver to handle elliptic,
+            # parabolic, and hyperbolic orbits using one set of equations it is replaced with the inverse semi-major
+            # axis.
             satellite.orbit.inverse_sm_axis = (
                 (2 * satellite.orbit.grav_param / np.linalg.norm(initial_positions[name])
                     - np.linalg.norm(initial_velocities[name]) ** 2)
                         / satellite.orbit.grav_param
             )
 
+            # Setup the loggers.
             for logger in satellite.loggers:
                 logger.setup(initial_orbit=satellite.orbit, timesteps=self.timesteps)
 
-        # Propagation.
+        # Begin the actual propagation loop. This is made of two loops: timesteps (outer), satellites (inner).
+        # For each satellite, first retrieve the orbit. Then, compute the universal variable on the next time step from
+        # Kepler's equation. From there the Stumpff series can be computed and in turn used to assemble the f and g
+        # functions and their derivatives. Finally, from these the position and velocity may be found at the next
+        # timestep.
         for timestep in range(1, self.timesteps + 1):
             for name, satellite in self.satellites.items():
                 orbit = satellite.orbit
@@ -122,7 +131,8 @@ class UniversalVariablePropagator(base.Propagator):
                             - orbit.universal_variable ** 3 / np.sqrt(orbit.grav_param) * s_func
                 )
 
-                # Compute new position (and true anomaly).
+                # Compute new position (and true anomaly). Only need to update fast variables because the other
+                # orbital elements are constant for Keplerian orbits.
                 orbit.position = f_func * initial_positions[name] + g_func * initial_velocities[name]
                 orbit.update_true_anomaly()
                 orbit.update_argl()
@@ -139,39 +149,47 @@ class UniversalVariablePropagator(base.Propagator):
                 else:
                     gdot_func = 1 - orbit.universal_variable ** 2 / np.linalg.norm(orbit.position) * c_func
 
-                # Compute new velocities.
+                # Compute the new velocity.
                 orbit.velocity = fdot_func * initial_positions[name] + gdot_func * initial_velocities[name]
 
-            # Save results.
+            # Save results from this timestep.
             self.log(timestep)
 
     def stumpff_funcs(self, stumpff_param) -> tuple[float, float]:
+        r"""
+        Computes the Stumpff functions/series for a given value of the Stumpff parameter.
+
+        The form of the Stumpff series is not based off the type of orbit, instead it is based of the sign and magnitude
+        of the Stumpff parameter. Large and positive = trigonometric, small = summation, large and negative = hyper-
+        trigonometric.
+
+        Parameters
+        ----------
+        stumpff_param : float
+            The current Stumpff parameter.
+
+        Returns
+        -------
+        s_func : float
+            The "sine" Stumpff function/series.
+        c_func : float
+            The "cosine" Stumpff function/series.
         """
-        Special series which converge absolutely for any value of the Stumpff parameter, defined as the inverse of the
-        semi-major axis times the universal variable squared. For "large" negative or positive values of the parameter
-        these series have special closed-form hyperbolic or sinusoidal functions respectively. In the case where the
-        parameter approaches zero instead the exact series definition must be used, in which case the number of terms is
-        set by self.stumpff_series_length.
 
-        :param stumpff_param: Stumpff parameter.
-
-        :return: The "sine and cosine" Stumpff series referred to as the s_func and c_func.
-        """
-
-        if np.abs(stumpff_param) < self.stumpff_tol:  # Near-parabolic case.
+        if np.abs(stumpff_param) < self.stumpff_tol:  # Summation form.
             s_func = 0
             c_func = 0
             for i in range(self.stumpff_series_length):
                 s_func += (-stumpff_param) ** i / sp.special.factorial(2 * i + 3)
                 c_func += (-stumpff_param) ** i / sp.special.factorial(2 * i + 2)
-        elif stumpff_param > 0:  # Elliptic case.
+        elif stumpff_param > 0:  # Trigonometric form.
             s_func = (
                     (np.sqrt(stumpff_param) - np.sin(np.sqrt(stumpff_param))) / np.sqrt(stumpff_param ** 3)
             )
             c_func = (
                     (1 - np.cos(np.sqrt(stumpff_param))) / stumpff_param
             )
-        else:  # Hyperbolic case.
+        else:  # Hyper-trigonometric form.
             s_func = (
                     (np.sinh(np.sqrt(-stumpff_param)) - np.sqrt(-stumpff_param)) / np.sqrt(-stumpff_param ** 3)
             )
@@ -191,15 +209,33 @@ class UniversalVariablePropagator(base.Propagator):
             initial_velocity: np.ndarray,
             initial_guess: float,
     ) -> float:
-        """
-        Function which yields the universal variable at the current time (as stored by self.orbit.time).
+        r"""
+        Function used to compute the new universal variable directly as a function of time.
 
-        :param initial_time: Time at start of propagation
-        :param initial_position: Position at start of propagation, a (3, ) vector.
-        :param initial_velocity: Velocity at start of propagation, a (3, ) vector.
-        :param initial_guess: Initial guess for the universal variable.
+        Kepler's equation is transcendental wrt. universal variable so root-finding via :func:`scipy.optimize.newton()`
+        is used to solve for it. The ideal initial guess is just the universal variable on the previous timestep.
 
-        :return: New universal variable at the current time plus the desired timestep.
+        Parameters
+        ----------
+        time : float
+            Current time.
+        inverse_sm_axis : float
+            Inverse of the semi-major axis of the orbit.
+        grav_param : float
+            Gravitational parameter of the orbit.
+        initial_time : float
+            Base point for time at which propagation began.
+        initial_position : np.ndarray
+            Base point for position when propagation began.
+        initial_velocity : np.ndarray
+            Base point for velocity when propagation began.
+        initial_guess : float
+            Initial guess for the universal variable.
+
+        Returns
+        -------
+        universal_variable : float
+            Universal_variable at the next time step.
         """
 
         # Create the function to use in root-finding.
