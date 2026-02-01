@@ -131,7 +131,8 @@ class ClassicalElementsLogger(Logger):
     sm_axis_history : np.ndarray
         (1, N) array of the semi-major axis over time. Units: :math:`m`.
     sl_rectum_history : np.ndarray
-        (1, N) array of the semi-latus rectum over time. Units: :math:`m`.
+        (1, N) array of the semi-latus rectum over time.
+        Units: :math:`m`.
     eccentricity_history : np.ndarray
         (1, N) array of the eccentricity over time.
     inclination_history : np.ndarray
@@ -139,11 +140,14 @@ class ClassicalElementsLogger(Logger):
     raan_history : np.ndarray
         (1, N) array of the RAAN over time. Units: :math:`rad`.
     argp_history : np.ndarray
-        (1, N) array of the argument of periapsis over time. Units: :math:`rad`.
+        (1, N) array of the argument of periapsis over time.
+        Units: :math:`rad`.
     true_anomaly_history : np.ndarray
-        (1, N) array of the true anomaly over time. Units: :math:`rad`.
+        (1, N) array of the true anomaly over time.
+        Units: :math:`rad`.
     longp_history : np.ndarray
-        (1, N) array of the longitude of periapsis over time. Units: :math:`rad`.
+        (1, N) array of the longitude of periapsis over time.
+        Units: :math:`rad`.
     argl_history : np.ndarray
         (1, N) array of the argument of latitude over time. Units: :math:`rad`.
     true_latitude_history : np.ndarray

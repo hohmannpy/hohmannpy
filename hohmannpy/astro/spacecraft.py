@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import scipy as sp
 
-from . import orbit
+from . import orbit, propagation
 
 if TYPE_CHECKING:
     from . import time, logging
@@ -67,8 +67,8 @@ class Satellite:
 
     Notes
     -----
-    Once a satellite's orbit is propagator, the recorded data (attributes) of any ``Logger`` attached to this satellite
-    can be access from the satellite using :meth:`__getattr_()`.
+    Once a satellite's orbit is propagator, the recorded data (attributes) of any :class:`~hohmannpy.astro.Logger`
+    attached to this satellite can be access from the satellite using ``__getattr_()``.
     """
 
     def __init__(
@@ -109,6 +109,11 @@ class Moon(Satellite):
     Special "spacecraft" which represents the Earth's moon.
 
     Used by :class:`~hohmannpy.astro.LunarGravity` for simulating lunar gravity third-body perturbing effects.
+
+    Parameters
+    ----------
+    initial_true_anomaly : float
+        The starting true anomaly of the Moon in :math:`rad`.
     """
 
     def __init__(self, initial_true_anomaly: float):
@@ -130,9 +135,17 @@ class Earth(Satellite):
     invert the position vector.
 
     Used by :class:`~hohmannpy.astro.SolarGravity` for simulating solar gravity third-body perturbing effects.
+
+    Parameters
+    ----------
+    initial_global_time: :class:`~hohmannpy.astro.Time`
+        Gregorian date and UT1 time at which simulation begins. This is used to locate the Earth via
+        :meth:`compute_initial_true_anomaly()`.
+    solver_tol : float
+        Error tolerance when performing root-finding to solver Kepler's equation in ``compute_initial_true_anomaly()``.
     """
 
-    def __init__(self, initial_global_time: time.Time, solver_tol: float):
+    def __init__(self, initial_global_time: time.Time, solver_tol: float = 1e-8):
         name = "Earth"
 
         initial_true_anomaly = self.compute_initial_true_anomaly(initial_global_time, solver_tol)

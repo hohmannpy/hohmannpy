@@ -347,17 +347,6 @@ class DynamicRenderEngine(RenderEngine):
 
     Attributes
     ----------
-    scene: :class:`pygfx.Scene`
-        The collection of graphical assets (objects, light sources, skyboxes, etc;) to render.
-    canvas: :class:`rendercanvas.auto.RenderCanvas`
-        Surface onto which the scene is rendered.
-    camera: :class:`~hohmannpy.ui.OrbitalCamera`
-        Movable camera that controls which part of :attr:`scene` is currently rendered. Added to ``scene`` via
-        instantiating an orbit controller with it as a parameter. This also adds mouse control functionality as the base
-        camera class only allows for keyboard control in conjunction with the parent class'
-        :meth:`event_handler()` method.
-    earth: :class:`pygfx.Mesh`
-        Earth object used as the central body for displayed orbits.
     base_earth_rotation: :class:`pylinalg.Quaternion`
         Quaternion representing the initial rotation of the earth at ``initial_global_time`` with respect to the mean
         Vernal equinox. The Vernal equinox points in the x-direction of the scene coordinates.
@@ -373,14 +362,13 @@ class DynamicRenderEngine(RenderEngine):
     local_time: float
         The current real-world time (in seconds).
     sim_time: float
-        The time since the mission began (in seconds). This may vary from :attr:`local_time` because the sim may be sped
-        up.
+        The time since the mission began (in seconds). This may vary from ``local_time`` because the sim may be sped up.
     final_sim_time: float
         The last timestep propagator for the mission. After this is reached the sim resets.
     speed_factor: float
-        How much fast :attr:`sim_time` is compared to ``local_time``.
+        How much fast ``sim_time`` is compared to ``local_time``.
     old_speed_factor: float
-        The :attr:`speed_factor` before pausing is saved so that when the sim is unpaused the sim returns to the
+        The ``speed_factor`` before pausing is saved so that when the sim is unpaused the sim returns to the
         pre-pause ``speed_factor``.
 
     See Also
@@ -476,7 +464,7 @@ class DynamicRenderEngine(RenderEngine):
 
     def time_event_handler(self, event):
         r"""
-        Extension of the event handler from :class:`~hohmannpy.ui.RenderEngine` that adds in time controls.
+        Extension of the event handler from ``RenderEngine`` that adds in time controls.
 
         Parameters
         ----------

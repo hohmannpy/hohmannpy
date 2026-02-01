@@ -19,8 +19,8 @@ class CowellPropagator(base.Propagator):
     time as opposed to a Keplerian propagator which has a fixed accuracy. To mitigate this decrease the step size.
 
     step_size : float
-        Time interval between propagation steps. If one is not provided by the user it will be set in ``propagate()`` to
-        60 :math:`s`.
+        Time interval between propagation steps. If one is not provided by the user it will be set in
+        :meth:`propagate()` to 60 :math:`s`.
     """
 
     def __init__(
@@ -46,8 +46,7 @@ class CowellPropagator(base.Propagator):
         runtime : float
             How many :math:`s` to run the propagation for.
         perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
-            Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are
-            added a non-Keplerian propagator such as ``CowellPropagator`` must be used.
+            Perturbations to add to the mission to increase the fidelity of orbital simulation.
         """
 
         super().propagate(satellites, runtime, perturbing_forces)

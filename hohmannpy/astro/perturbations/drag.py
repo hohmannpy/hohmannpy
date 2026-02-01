@@ -9,31 +9,19 @@ from ...dynamics import dcms
 from . import base
 
 if TYPE_CHECKING:
-    from .. import satellites
+    from .. import spacecraft
 
 
-# TODO: Deal with the singularity at the poles (division by a trig term which is zero at polar colatitudes).
 class AtmosphericDrag(base.Perturbation):
     r"""
     Perturbation caused by drag due to Earth's atmosphere.
 
-    The Earth's atmosphere, especially the thermo- and exosphere, have highly variable properties due to fluctuations in
-    the Earth's magnetic field, solar activity, and the position of the Earth along its orbit. The density is needed to
-    compute the drag and is found via linear interpolation of the 2012 Committee on Space Research (COSPAR)
-    International Reference Atmosphere (CIRA-12) model. Three different tables are provided, each representing a varying
-    level of solar and geomagnetic activity.
-
-    Two additional model simplifications are made. The use of a constant ballistic coefficient also simplifies the model
-    by removing drag-attitude dependence. Also, computing geodetic latitude (which is needed to get an accurate
-    altitude measurement) involves knowing the GMST (the angle between the Greenwich meridian and Vernal equinox) of the
-    Earth. For simplicity the GMST is located accurately (including precession of the Vernal equinox) at the start of
-    the simulation. However, for the length of propagation it is said to simply rotate at the Earth's mean rotation
-    rate, ignoring precession effects.
+    Atmospheric density is found using interpolation of the 2012 Committee on Space Research (COSPAR) International
+    Reference Atmosphere (CIRA-12) model. Three different density tables are provided, each representing a varying level
+    of solar and geomagnetic activity, selected between using the ``solar_activity`` parameter.
 
     Parameters
     ----------
-    ballistic_coeff : float
-        Drag times reference area of the satellite normalized by the mass.
     gmst : float
         Current angle of the Greenwich meridian in radians.
     solar_activity : str
@@ -44,8 +32,6 @@ class AtmosphericDrag(base.Perturbation):
 
     Attributes
     ----------
-    ballistic_coeff : float
-        Drag times reference area of the satellite normalized by the mass.
     initial_gmst : float
         Initial angle of the Greenwich meridian in :math:`rad` when propagation began.
     solver_tol : float
@@ -59,7 +45,21 @@ class AtmosphericDrag(base.Perturbation):
 
     Notes
     -----
-    The altitude above an ellipsoid Earth is found using Algorith 12 in Vallado [2]_.
+    The following assumptions are made for this implementation:
+
+    1) Density changes due to solar and geomagnetic activity are ignored apart from determining the mean density distribution.
+
+    2) Cubic spline interpolation of an atmospheric density table is a sufficient representation of the true density wrt. time.
+
+    3) The GMST of the Earth is initially accurately computed wrt. the Vernal equinox (ignoring nutation) and is then said to linearly rotate at the Earth's mean rotation rate without precession.
+
+    4) The drag experienced by a satellite is attitude-independent and simply a function of its ballistic coefficient.
+
+    5) When computing the geodetic altitude the Earth is assumed to have a uniform ellipsoidal shape. This is less accurate than the true altitude found using a series expansion (similar to the non-spherical Earth's geopotential) but the accuracy loss is small.
+
+    6) The velocity of a satellite wrt. the atmosphere is simply its velocity minus the rotation rate of the Earth cross the satellite's position.
+
+    Additionally, the  altitude above an ellipsoid Earth is found using Algorithm 12 in Vallado [2]_.
 
     .. [1] COSPAR, COSPAR International Reference Atmosphere – CIRA-2012, Version: 1.0, spacewx.com, 2012.
     .. [2] Vallado, D. A., Fundamentals of Astrodynamics and Applications, 3rd ed., Microcosm Press/Springer, 2007.
@@ -76,6 +76,7 @@ class AtmosphericDrag(base.Perturbation):
         self.initial_gmst = gmst
         self.solver_tol = solver_tol
 
+        # Import the density table to use based on the chosen solar and geomagnetic activity level.
         match solar_activity:
             case "low":
                 with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_low_activity.csv").open() as f:
@@ -83,7 +84,7 @@ class AtmosphericDrag(base.Perturbation):
                     self.densities = sp.interpolate.make_interp_spline(
                         density_curve[:, 0].squeeze(),
                         density_curve[:, 1].squeeze(),
-                        k=1
+                        k=3
                     )
             case "moderate":
                 with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_moderate_activity.csv").open() as f:
@@ -91,7 +92,7 @@ class AtmosphericDrag(base.Perturbation):
                     self.densities = sp.interpolate.make_interp_spline(
                         density_curve[:, 0].squeeze(),
                         density_curve[:, 1].squeeze(),
-                        k=1
+                        k=3
                     )
             case "high":
                 with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_high_activity.csv").open() as f:
@@ -99,29 +100,27 @@ class AtmosphericDrag(base.Perturbation):
                     self.densities = sp.interpolate.make_interp_spline(
                         density_curve[:, 0].squeeze(),
                         density_curve[:, 1].squeeze(),
-                        k=1
+                        k=3
                     )
         self.exosphere_bound = density_curve[-1, 0]
 
-    def evaluate(self, time: float, state: np.ndarray, satellite: satellites.Satellite) -> np.array:
+    def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.array:
         r"""
         Computes the perturbing acceleration using a model for the drag caused by the Earth's atmosphere.
-
-        The geodetic altitude is first found using :meth:`compute_altitude()` assuming an ellipsoid Earth and then the
-        density is found via interpolation of atmospheric data. Using this the velocity wrt. the relative wind and then
-        acceleration due to drag are found.
 
         Parameters
         ----------
         time : float
             Current time in seconds since propagation began.
         state : np.ndarray
-            Current translational state in PCI coordinates given as (position, velocity).
+            Current translational state in ECI coordinates given as (position, velocity).
+        satellite : :class:`~hohmannpy.astro.Satellite`
+            Satellite object. Passed so that its ``ballistic_coefficient`` may be accessed.
 
         Returns
         -------
-        acceleration : tuple[float, float, float]
-            Current translational acceleration in PCI coordinates.
+        acceleration : np.ndarray
+            Current translational acceleration in ECI coordinates.
         """
 
         earth_rot = 7.292115e-5  # Mean rotation rate of the Earth in radians.
@@ -129,19 +128,19 @@ class AtmosphericDrag(base.Perturbation):
         # Update GMST using simplified precession-free rotation of the Earth.
         gmst = self.initial_gmst + earth_rot * time
 
-        # Transform position to the Earth-centered-Earth-fixed frame and then compute the altitude.
+        # Transform position to the Earth-centered-Earth-fixed frame and then compute the geodetic altitude.
         inertial_2_earth_dcm = dcms.euler_2_dcm(gmst, 3)
         position = inertial_2_earth_dcm @ state[:3]
         altitude = self.compute_altitude(position)
 
-        if altitude / 1000 > self.exosphere_bound:  # Effectively no atmosphere above this altitude.
-            return 0, 0, 0
+        # If above the exosphere_bound, there is effectively no atmosphere.
+        if altitude / 1000 > self.exosphere_bound:
+            return np.array([0, 0, 0])
 
         # Compute density.
         density = self.densities(altitude / 1000)  # Need to convert m -> km
 
-        # Compute velocity using a simplified approximation where the atmosphere is assumed fixed to the Earth rotating
-        # at its mean rotation rate.
+        # Compute the velocity of the satellite wrt. the atmosphere.
         velocity = state[3:] - np.cross(np.array([0, 0, earth_rot]), state[:3])
 
         # Compute perturbing acceleration.
@@ -153,10 +152,6 @@ class AtmosphericDrag(base.Perturbation):
         """
         Compute the altitude above the surface of an ellipsoid Earth.
 
-        The geodetic latitude can be found as a function of the satellite's current position, however this function is
-        transcendental in latitude and hence must be solved numerically. Fixed-point iteration is used. Once the
-        latitude is known the ellipsoidal altitude may be computed.
-
         Parameters
         ----------
         position : np.ndarray
@@ -166,22 +161,18 @@ class AtmosphericDrag(base.Perturbation):
         -------
         altitude : float
             Current height above sea level of an ellipsoid Earth.
-
-        Notes
-        -----
-        This is less accurate than using the true altitude based on a series expansion (similar to the non-spherical
-        geopotential gravity equation) but the accuracy loss is small.
         """
 
         earth_radius = 6378.1363e3
         earth_eccentricity = 0.081819221456
 
-        # Compute initial guess for the latitude.
-        x = np.arctan2(position[2], np.sqrt(position[0] ** 2 + position[1] ** 2))
+        # The geodetic latitude can be found as a function of the satellite's current position, however this function is
+        # transcendental in latitude and hence must be solved numerically. Fixed-point iteration is used. Once the
+        # latitude is known the ellipsoidal altitude may be computed.
+        x = np.arctan2(position[2], np.sqrt(position[0] ** 2 + position[1] ** 2))  # Initial guess.
         x_old = 100  # Dummy value to ensure error is initially above tolerance.
 
-        # Perform fixed-point iteration.
-        while abs(x - x_old) > self.solver_tol:
+        while abs(x - x_old) > self.solver_tol:  # Fixed point iteration.
             x_old = x
             radius_of_curvature = earth_radius / np.sqrt((1 - earth_eccentricity ** 2 * np.sin(x) ** 2))
             x = np.arctan2(

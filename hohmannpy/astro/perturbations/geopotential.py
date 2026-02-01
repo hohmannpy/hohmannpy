@@ -9,28 +9,15 @@ from ...dynamics import dcms
 from . import base
 
 if TYPE_CHECKING:
-    from .. import satellites
+    from .. import spacecraft
 
 
-# TODO: Deal with the singularity at the poles (division by a trig term which is zero at polar colatitudes).
 class NonSphericalEarth(base.Perturbation):
     r"""
-    Perturbation caused by the deviations of the Earth's math distribution from a point-mass. It is assumed that the
-    gravitational potential field of the non-spherical Earth is given by the solution to a geopotential
-    partial-differential equation and in addition that this field is conservative such that the perturbing force is it's
-    gradient.
+    Perturbation caused by the deviations of the Earth's math distribution from a point-mass.
 
-    The geopotential equation is a partial differential equation of three independent variables, spherical coordinates.
-    Since this equation is separable it's solution is an infinite series whose coefficients, known as Stokes
-    coefficients (C and S), have been determined analytically. This implementation uses the 1984 Earth Gravitational
-    Model (EGM84) which includes harmonics up to order and degree 180. See the Notes section for how to upload your own
-    survey data.
-
-    In addition, to determine the geopotential at a given point the colatitude and longitude of the satellite must be
-    known. This requires knowledge of the current GMST (angle between the Greenwich meridian and the Vernal equinox) of
-    the Earth. For simplicity, the GMST is located accurately (including precession of the Vernal equinox) at the start
-    of the simulation. However, for the length of propagation it is said to simply rotate at the Earth's mean rotation
-    rate, ignoring precession effects.
+    The zonal, tesseral, and sectorial geopotential coefficients are taken from the 1985 Earth Gravitational Model
+    (EGM84).
 
     Parameters
     ----------
@@ -55,6 +42,16 @@ class NonSphericalEarth(base.Perturbation):
         Cosine-like Stokes coefficients (unnormalized) from EGM84.
     s_coeffs : np.ndarray
         Sine-like Stokes coefficients (unnormalized) from EGM84.
+
+    Notes
+    -----
+    The following assumptions are made for this implementation:
+
+    1) The gravitational potential field of the Earth is given by the solution to the geopotential partial-differential equation.
+
+    2) The first-order zonal harmonic is not needed since point-mass gravity is implemented by the propagator.
+
+    3) The GMST of the Earth is initially accurately computed wrt. the Vernal equinox (ignoring nutation) and is then said to linearly rotate at the Earth's mean rotation rate without precession.
     """
 
     def __init__(self, degree: int, gmst: float, zonal: bool = False):
@@ -64,21 +61,16 @@ class NonSphericalEarth(base.Perturbation):
         self.zonal = zonal
         self.initial_gmst = gmst
 
+        # Import the harmonic coefficients.
         with importlib.resources.files("hohmannpy.resources").joinpath("egm84_c_coeffs.csv").open() as f:
             self.c_coeffs = np.loadtxt(f, delimiter=",")  # n rows, m columns, from [0, 180]
 
         with importlib.resources.files("hohmannpy.resources").joinpath("egm84_s_coeffs.csv").open() as f:
             self.s_coeffs = np.loadtxt(f, delimiter=",")  # n rows, m columns, from [0, 180]
 
-    def evaluate(self, time: float, state: np.ndarray, satellite: satellites.Satellite) -> np.ndarray:
+    def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""
         Computes the perturbing acceleration using a geopotential model of the Earth's gravitational field.
-
-        First the colatitude and longitude are found from the current time and state using
-        :meth:`compute_colat_and_long`. The, the perturbing accelerations are computed in Earth-centered Earth-fixed
-        (ECEF) curvilinear/spherical coordinates. Finally, this is transformed back to rectilinear and then
-        Earth-centered inertial (ECI) coordinates using DCMs generated via
-        :func:`~hohmannpy.dynamics.dcms.euler_2_dcm()`.
 
         Parameters
         ----------
@@ -86,10 +78,12 @@ class NonSphericalEarth(base.Perturbation):
             Current time in seconds since propagation began.
         state : np.ndarray
             Current translational state in ECI coordinates given as (position, velocity).
+        satellite : :class:`~hohmannpy.astro.Satellite`
+            Unused parameter simply based due to ``@abstractmethod`` requirements.
 
         Returns
         -------
-        acceleration : tuple[float, float, float]
+        acceleration : np.ndarray
             Current translational acceleration in ECI coordinates.
         """
 
@@ -163,9 +157,9 @@ class NonSphericalEarth(base.Perturbation):
         Returns
         -------
         colatitude : float
-            Angle between the ECEF 3-axis and position vector.
+            Angle between the Earth-centered Earth-fixed (ECEF) 3-axis and position vector.
         longitude : float
-            Angle between the ECEF 1-axis and the projection of the position vector in to the 1-2 ECEF plane..
+            Angle between the ECEF 1-axis and the projection of the position vector in to the 1-2 ECEF plane.
         """
 
         earth_rot = 7.292115e-5  # Mean rotation rate of the Earth in rad/s.
@@ -189,11 +183,7 @@ class J2(base.Perturbation):
     Perturbation caused by Earth's equatorial bulge, known as the J2 effect.
 
     This is a simplified version of :class:`~hohmannpy.astro.perturbations.NonSphericalEarth` intended for us in
-    modeling purely the J2 effect. The J2-acceleration is computed explicitly in Cartesian Earth-centered Earth-fixed
-    (ECEF) coordinates before being transformed back to Earth-centered inertial coordinates (ECI). This requires use of
-    the GMST to orient the Earth wrt. the inertial frame. For simplicity, the GMST is located accurately (including
-    precession of the Vernal equinox) at the start of the simulation. However, for the length of propagation it is said
-    to simply rotate at the Earth's mean rotation rate, ignoring precession effects.
+    modeling purely the J2 effect. The J2-acceleration is computed explicitly using general perturbation theory.
 
     Parameters
     ----------
@@ -205,9 +195,19 @@ class J2(base.Perturbation):
     initial_gmst : float
         Initial angle of the Greenwich meridian in :math:`rad` when propagation began.
 
+    Notes
+    -----
+    The following assumptions are made for this implementation:
+
+    1) The gravitational potential field of the Earth is given by the solution to the geopotential partial-differential equation.
+
+    2) Only the J2 zonal harmonic is considered.
+
+    3) The GMST of the Earth is initially accurately computed wrt. the Vernal equinox (ignoring nutation) and is then said to linearly rotate at the Earth's mean rotation rate without precession.
+
     See Also
     --------
-    :class:`~hohmannpy.astro.perturbations.NonSphericalEarth` : Generalized version of this perturbation which can model
+    :class:`~hohmannpy.astro.NonSphericalEarth` : Generalized version of this perturbation which can model
         N-order zonal harmonic effects as well as tesseral and sectoral ones.
     """
 
@@ -216,7 +216,7 @@ class J2(base.Perturbation):
 
         self.initial_gmst = gmst
 
-    def evaluate(self, time: float, state: np.ndarray, satellite: satellites.Satellite) -> np.ndarry:
+    def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""
         Computes the perturbing acceleration due to the J2 effect.
 
@@ -226,11 +226,13 @@ class J2(base.Perturbation):
             Current time in seconds since propagation began.
         state : np.ndarray
             Current translational state in ECI coordinates given as (position, velocity).
+        satellite : :class:`~hohmannpy.astro.Satellite`
+            Unused parameter simply based due to ``@abstractmethod`` requirements.
 
         Returns
         -------
-        acceleration : tuple[float, float, float]
-            Current translational acceleration in PCI coordinates.
+        acceleration : np.ndarray
+            Current translational acceleration in ECI coordinates.
         """
 
         earth_radius = 6378.1363e3
@@ -240,17 +242,21 @@ class J2(base.Perturbation):
 
         radius = np.linalg.norm(state[:3])
 
+        # Convert the position vector from the ECI to ECEF frame.
         gmst = self.initial_gmst + earth_rot * time
         inertial_2_earth_dcm = dcms.euler_2_dcm(gmst, 3)
         position = inertial_2_earth_dcm @ state[:3]
 
-        acceleration = -3 * j2 * grav_param * earth_radius ** 2 / (2 * radius ** 5) * np.array([
-            position[0] * (1 - 5 * position[2] ** 2 / radius ** 2),
-            position[1] * (1 - 5 * position[2] ** 2 / radius ** 2),
-            position[2] * (3 - 5 * position[2] ** 2 / radius ** 2)
-        ]
+        # Compute the J2 acceleration.
+        acceleration = -3 * j2 * grav_param * earth_radius ** 2 / (2 * radius ** 5) * np.array(
+            [
+                position[0] * (1 - 5 * position[2] ** 2 / radius ** 2),
+                position[1] * (1 - 5 * position[2] ** 2 / radius ** 2),
+                position[2] * (3 - 5 * position[2] ** 2 / radius ** 2)
+            ]
         )
 
+        # Convert the acceleration vector from the ECEF back to the ECI frame.
         acceleration = inertial_2_earth_dcm.T @ acceleration
 
         return acceleration

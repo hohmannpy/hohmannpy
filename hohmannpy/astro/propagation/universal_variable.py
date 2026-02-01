@@ -60,14 +60,25 @@ class UniversalVariablePropagator(base.Propagator):
     def propagate(
             self,
             satellites: dict[str, spacecraft.Satellite],
-            final_time: float,
+            runtime: float,
             perturbing_forces: list[perturbations.Perturbation] = None
     ):
         r"""
         Perform orbit propagation using the universal variable form of Kepler's method.
+
+        Parameters
+        ----------
+        satellites : dict[str, :class:`~hohmannpy.astro.Satellite`]
+            Dictionary which hold the orbits to propagate as an attribute named ``orbit`` attached to each satellite.
+            Satellites are indexed by their name.
+        runtime : float
+            How many :math:`s` to run the propagation for.
+        perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
+            Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are
+            added a non-Keplerian propagator such as ``CowellPropagator`` must be used.
         """
 
-        super().propagate(satellites, final_time, perturbing_forces)
+        super().propagate(satellites, runtime, perturbing_forces)
 
         # Get initial values used for propagation and set up logging capabilities. This involves iterating through each
         # satellite and extracting attributes of their orbits. Like the satellites themselves these are stored as

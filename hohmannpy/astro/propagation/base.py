@@ -76,7 +76,7 @@ class Propagator:
 
     def log(self, timestep):
         r"""
-        For every satellite being propagated access their stored :class:`~hohmannpy.astro.Logger`s and log data.
+        For every satellite being propagated access their stored :class:`~hohmannpy.astro.Logger`'s and log data.
         """
 
         for satellite in self.satellites.values():

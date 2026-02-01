@@ -34,7 +34,11 @@ class Perturbation(ABC):
             Current time in seconds since propagation began.
         state : np.ndarray
             Current translational state in planet-centered inertial coordinates given as (position, velocity).
-        satellite
+        satellite : :class:`~hohmannpy.astro.Satellite`
+            The satellite object experiencing the perturbing acceleration. It is passed so that attributes of the
+            satellite can be used in computing perturbing acceleration, such as the ``ballistic_coeff`` by
+            :class:`~hohmannpy.astro.AtmosphericDrag`. However, the state of the satellite should never be accessed
+            directly, only via the passed ``state`` parameter.
         """
 
         pass

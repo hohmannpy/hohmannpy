@@ -12,8 +12,8 @@ class Orbit:
     schemes (from state, from orbital elements, Gibb's method, etc;) as well as functions to compute all the parameters
     which define an orbit.
 
-    The basic ``__init__()`` creates a :class:`~hohmannpy.astro.Orbit` from a Cartesian state. As an alternative to this,
-    a variety of alternative instantiations decorated using ``@classmethod`` are available for alternative forms of orbit
+    The basic ``__init__()`` creates an object from the Cartesian state. As an alternative to this, a variety of
+    different instantiations decorated using ``@classmethod`` are available for alternative forms of orbit
     determination. Internally, these all use the input parameters to generate the Cartesian state which is then used to
     call the base ``__init__()``.
 
@@ -104,10 +104,10 @@ class Orbit:
         :class:`~hohmannpy.astro.UniversalVariablePropagator`.
     universal_variable: float
         Universal variable of the orbit. Not used by default unless orbit is propagated using
-        :class:`~hohmannpy.astro.UniversalVariablePropagator`.
+        ``UniversalVariablePropagator``.
     inverse_sm_axis: float
-        Inverse of the semi-major axis of the orbit. Used by :class:`~hohmannpy.astro.UniversalVariablePropagator` so
-        that it can handle parabolic orbits.
+        Inverse of the semi-major axis of the orbit. Used by ``UniversalVariablePropagator`` so that it can handle
+        parabolic orbits.
     track_equinoctial : bool
         Flag which indicates whether to track the equinoctial elements. By default, only the Cartesian state and the
         classical orbital elements (as well as their degenerate cases) are tracked.

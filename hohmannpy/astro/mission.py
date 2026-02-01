@@ -19,9 +19,9 @@ class Mission:
     ----------
     satellites : list of :class:`~hohmannpy.astro.Satellite`
         List of satellites whose orbits the Mission will propagate.
-    initial_global_time : time.Time
+    initial_global_time : :class:`~hohmannpy.astro.Time`
         The Gregorian date and UT1 time to start the mission at.
-    initial_global_time : time.Time
+    final_global_time : :class:`~hohmannpy.astro.Time`
         The Gregorian date and UT1 time to end the mission at.
     loggers : list[:class:`~hohmannpy.astro.Logger`]
         Loggers determine which data to record for each satellite during propagation. To see what data each logger
@@ -39,9 +39,9 @@ class Mission:
     satellites : dict[str, :class:`~hohmannpy.astro.Satellite`]
         Dictionary of satellites created using the ``name`` parameter of each ``Satellite`` as the key and the object
         itself as the value.
-    initial_global_time : time.Time
+    initial_global_time : :class:`~hohmannpy.astro.Time`
         The Gregorian date and UT1 time to start the mission at.
-    initial_global_time : time.Time
+    final_global_time : :class:`~hohmannpy.astro.Time`
         The Gregorian date and UT1 time to end the mission at.
     propagator : :class:`~hohmannpy.astro.Propagator`
         Propagation technique to use to simulate the orbits of each ``Satellite``. If none was passed during
@@ -112,7 +112,7 @@ class Mission:
 
     def simulate(self):
         r"""
-        Propagate the orbits of all ``Satellites``.
+        Propagate the orbits of all stored ``Satellite``.
         """
 
         self.propagator.propagate(
