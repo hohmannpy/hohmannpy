@@ -102,7 +102,8 @@ class AtmosphericDrag(base.Perturbation):
                     k=3
                 )
         else:
-            raise ValueError(f"{solar_activity} is not a valid setting, please choose from 'low', 'medium', or 'high'.")
+            raise ValueError(f"{solar_activity} is not a valid setting for the solar activity, please choose from "
+                             f"'low', 'medium', or 'high'.")
         self.exosphere_bound = density_curve[-1, 0]
 
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.array:

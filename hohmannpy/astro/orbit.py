@@ -438,13 +438,15 @@ class Orbit:
         )
 
         # Compute the velocity corresponding to current position.
-        match current_position_index:  # Select current position.
-            case 1:
-                position = position1
-            case 2:
-                position = position2
-            case 3:
-                position = position3
+        if current_position_index == 1:
+            position = position1
+        elif current_position_index == 2:
+            position = position2
+        elif current_position_index == 3:
+            position = position3
+        else:
+            raise ValueError(f"{current_position_index} is not a valid position index.")
+
         velocity = (
                 1 / np.linalg.norm(position)
                     * np.sqrt(grav_param / (np.linalg.norm(gibbs_vec1) * np.linalg.norm(gibbs_vec2)))
@@ -579,17 +581,18 @@ class Orbit:
             )
 
         # Compute the velocity corresponding to current position from the f and g functions.
-        match current_position_index:
-            case 1:
-                position = position1
-                velocity = (position2 - f_func * position1) / g_func
-            case 2:
-                position = position2
-                if fg_constraint:  # Implicitly uses fg-constraint to eliminate fdot_func and hence velocity1.
-                    velocity = (gdot_func * position2 - position1) / g_func
-                else:
-                    velocity1 = (position2 - f_func * position1) / g_func
-                    velocity = fdot_func * position1 + gdot_func * velocity1
+        if current_position_index == 1:
+            position = position1
+            velocity = (position2 - f_func * position1) / g_func
+        elif current_position_index == 2:
+            position = position2
+            if fg_constraint:  # Implicitly uses fg-constraint to eliminate fdot_func and hence velocity1.
+                velocity = (gdot_func * position2 - position1) / g_func
+            else:
+                velocity1 = (position2 - f_func * position1) / g_func
+                velocity = fdot_func * position1 + gdot_func * velocity1
+        else:
+            raise ValueError(f"{current_position_index} is not a valid position index.")
 
         return cls(position, velocity, grav_param, track_equinoctial)
 
