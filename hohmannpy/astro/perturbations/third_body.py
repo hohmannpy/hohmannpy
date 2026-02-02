@@ -6,11 +6,8 @@ import numpy as np
 import scipy as sp
 
 from ...dynamics import dcms
-from .. import propagation, time, orbit
+from .. import propagation, time, spacecraft, logging
 from . import base
-
-if TYPE_CHECKING:
-    from .. import spacecraft
 
 
 class ThirdBodyGravity(base.Perturbation):
@@ -101,6 +98,7 @@ class ThirdBodyGravity(base.Perturbation):
         # central body's orbit is not to be propagated instead set it to a function which always returns [0, 0, 0] when
         # passed any time value.
         propagator = propagation.UniversalVariablePropagator()
+        third_body.loggers = [logging.StateLogger()]
 
         if central_body is None:
             propagator.propagate(
@@ -112,6 +110,7 @@ class ThirdBodyGravity(base.Perturbation):
                 return np.array([0, 0, 0])
             self.cb_orbit_spline = dummy_spline
         else:
+            central_body.loggers = [logging.StateLogger()]
             propagator.propagate(
                 satellites={third_body.name: third_body, central_body.name: central_body},
                 runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,

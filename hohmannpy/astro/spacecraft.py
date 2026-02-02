@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import scipy as sp
 
-from . import orbit, propagation
+from . import orbit, logging
 
 if TYPE_CHECKING:
-    from . import time, logging
+    from . import time
 
 
 class Satellite:
@@ -127,6 +127,7 @@ class Moon(Satellite):
             true_anomaly=initial_true_anomaly,
         )
         super().__init__(name, starting_orbit)
+        self.loggers = [logging.StateLogger()]
 
 
 class Earth(Satellite):
@@ -159,6 +160,7 @@ class Earth(Satellite):
             grav_param=1.32712440018e20
         )
         super().__init__(name, starting_orbit)
+        self.loggers = [logging.StateLogger()]
 
     def compute_initial_true_anomaly(self, initial_global_time: time.Time, solver_tol: float):
         r"""
@@ -166,7 +168,7 @@ class Earth(Satellite):
 
         Parameters
         ----------
-        initial_global_time : time.Time
+        initial_global_time : :class:`~hohmannpy.astro.Time`
             Gregorian date and UT1 time at which the Earth is initially located.
         solver_tol : float
             Error tolerance to use when solving Kepler's equation.

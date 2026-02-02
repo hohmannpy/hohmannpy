@@ -138,7 +138,7 @@ class Mission:
         if display_flag == "dynamic":
             engine = rendering.DynamicRenderEngine(
                 satellites=self.satellites,
-                sim_length=(self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400,
+                runtime=(self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400,
                 initial_global_time=self.initial_global_time,
             )
         else:

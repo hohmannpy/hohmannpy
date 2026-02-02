@@ -123,7 +123,7 @@ class CowellPropagator(base.Propagator):
         # Append perturbing forces.
         if self.perturbing_forces is not None:
             for perturbing_force in self.perturbing_forces:
-                y3_perturb, y4_perturb, y5_perturb = perturbing_force.evaluate(t, y)
+                y3_perturb, y4_perturb, y5_perturb = perturbing_force.evaluate(t, y, satellite)
                 y3_dot += y3_perturb
                 y4_dot += y4_perturb
                 y5_dot += y5_perturb
