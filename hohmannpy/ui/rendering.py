@@ -163,34 +163,32 @@ class RenderEngine:
 
         if event["event_type"] == "key_down":
             key = event["key"].lower()
-            match key:
-                case "w":  # Rotate up.
-                    self.camera.elevation_dynamics_flag = 1
-                case "a":  # Rotate left.
-                    self.camera.azimuth_dynamics_flag = -1
-                case "s":  # Rotate down.
-                    self.camera.elevation_dynamics_flag = -1
-                case "d":  # Rotate right.
-                    self.camera.azimuth_dynamics_flag = 1
-                case "q":  # Zoom out.
-                    self.camera.radial_dynamics_flag = 1
-                case "e":  # Zoom in.
-                    self.camera.radial_dynamics_flag = -1
+            if key == "w":  # Rotate up.
+                self.camera.elevation_dynamics_flag = 1
+            elif key == "a":  # Rotate left.
+                self.camera.azimuth_dynamics_flag = -1
+            elif key == "s":  # Rotate down.
+                self.camera.elevation_dynamics_flag = -1
+            elif key == "d":  # Rotate right.
+                self.camera.azimuth_dynamics_flag = 1
+            elif key == "q":  # Zoom out.
+                self.camera.radial_dynamics_flag = 1
+            elif key == "e":  # Zoom in.
+                self.camera.radial_dynamics_flag = -1
         elif event["event_type"] == "key_up":
             key = event["key"].lower()
-            match key:
-                case "w":  # Rotate up.
-                    self.camera.elevation_dynamics_flag = 0
-                case "a":  # Rotate left.
-                    self.camera.azimuth_dynamics_flag = 0
-                case "s":  # Rotate down.
-                    self.camera.elevation_dynamics_flag = 0
-                case "d":  # Rotate right.
-                    self.camera.azimuth_dynamics_flag = 0
-                case "q":  # Zoom out.
-                    self.camera.radial_dynamics_flag = 0
-                case "e":  # Zoom in.
-                    self.camera.radial_dynamics_flag = 0
+            if key == "w":  # Rotate up.
+                self.camera.elevation_dynamics_flag = 0
+            elif key == "a":  # Rotate left.
+                self.camera.azimuth_dynamics_flag = 0
+            elif key == "s":  # Rotate down.
+                self.camera.elevation_dynamics_flag = 0
+            elif key == "d":  # Rotate right.
+                self.camera.azimuth_dynamics_flag = 0
+            elif key == "q":  # Zoom out.
+                self.camera.radial_dynamics_flag = 0
+            elif key == "e":  # Zoom in.
+                self.camera.radial_dynamics_flag = 0
 
 
     # --------------
@@ -476,23 +474,22 @@ class DynamicRenderEngine(RenderEngine):
 
         if event["event_type"] == "key_down":
             key = event["key"].lower()
-            match key:
-                case "1":  # 1x speed.
-                    self.speed_factor = 1
-                case "2":  # 10x speed.
-                    self.speed_factor = 10
-                case "3":  # 100x speed.
-                    self.speed_factor = 100
-                case "4":  # 1000x speed.
-                    self.speed_factor = 1000
-                case "5":  # 10000x speed.
-                    self.speed_factor = 10000
-                case " ":  # Play/pause.
-                    if self.speed_factor == 0:
-                        self.speed_factor = self.old_speed_factor
-                    else:
-                        self.old_speed_factor = self.speed_factor
-                        self.speed_factor = 0
+            if key == "1":  # 1x speed.
+                self.speed_factor = 1
+            elif key == "2":  # 10x speed.
+                self.speed_factor = 10
+            elif key == "3":  # 100x speed.
+                self.speed_factor = 100
+            elif key == "4":  # 1000x speed.
+                self.speed_factor = 1000
+            elif key == "5":  # 10000x speed.
+                self.speed_factor = 10000
+            elif key == " ":  # Play/pause.
+                if self.speed_factor == 0:
+                    self.speed_factor = self.old_speed_factor
+                else:
+                    self.old_speed_factor = self.speed_factor
+                    self.speed_factor = 0
 
     # --------------
     # OBJECT METHODS
