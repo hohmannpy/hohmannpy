@@ -16,7 +16,7 @@ dependencies = [
     "pandas",
     "imageio",
     "pylinalg",
-    "rendercanvas"
+    "rendercanvas",
     "pygfx"
 ]
 
