@@ -17,6 +17,7 @@ dependencies = [
     "imageio",
     "pylinalg",
     "rendercanvas"
+    "pygfx"
 ]
 
 [tool.setuptools.packages.find]
