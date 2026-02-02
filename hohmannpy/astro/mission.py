@@ -27,7 +27,7 @@ class Mission:
         Loggers determine which data to record for each satellite during propagation. To see what data each logger
         records, check the attributes labeled ``..._history`` in their respective documentation. For example,
         :class:`~hohmannpy.astro.StateLogger` records the time, position, and velocity of each ``Satellite``. After
-        ``simulate`` has been called, these values can also be accessed as attributes of each ``Satellite``.
+        ``simulate()`` has been called, these values can also be accessed as attributes of each ``Satellite``.
     propagator : :class:`~hohmannpy.astro.Propagator`
         Propagation technique to use to simulate the orbits of each ``Satellite``.
     perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
