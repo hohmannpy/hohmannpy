@@ -77,31 +77,32 @@ class AtmosphericDrag(base.Perturbation):
         self.solver_tol = solver_tol
 
         # Import the density table to use based on the chosen solar and geomagnetic activity level.
-        match solar_activity:
-            case "low":
-                with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_low_activity.csv").open() as f:
-                    density_curve = np.loadtxt(f, delimiter=",")  # altitude (km), density (kg/m^3)
-                    self.densities = sp.interpolate.make_interp_spline(
-                        density_curve[:, 0].squeeze(),
-                        density_curve[:, 1].squeeze(),
-                        k=3
-                    )
-            case "moderate":
-                with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_moderate_activity.csv").open() as f:
-                    density_curve = np.loadtxt(f, delimiter=",")  # altitude (km), density (kg/m^3)
-                    self.densities = sp.interpolate.make_interp_spline(
-                        density_curve[:, 0].squeeze(),
-                        density_curve[:, 1].squeeze(),
-                        k=3
-                    )
-            case "high":
-                with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_high_activity.csv").open() as f:
-                    density_curve = np.loadtxt(f, delimiter=",")  # altitude (km), density (kg/m^3)
-                    self.densities = sp.interpolate.make_interp_spline(
-                        density_curve[:, 0].squeeze(),
-                        density_curve[:, 1].squeeze(),
-                        k=3
-                    )
+        if solar_activity == "low":
+            with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_low_activity.csv").open() as f:
+                density_curve = np.loadtxt(f, delimiter=",")  # altitude (km), density (kg/m^3)
+                self.densities = sp.interpolate.make_interp_spline(
+                    density_curve[:, 0].squeeze(),
+                    density_curve[:, 1].squeeze(),
+                    k=3
+                )
+        elif solar_activity == "moderate":
+            with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_moderate_activity.csv").open() as f:
+                density_curve = np.loadtxt(f, delimiter=",")  # altitude (km), density (kg/m^3)
+                self.densities = sp.interpolate.make_interp_spline(
+                    density_curve[:, 0].squeeze(),
+                    density_curve[:, 1].squeeze(),
+                    k=3
+                )
+        elif solar_activity == "high":
+            with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_high_activity.csv").open() as f:
+                density_curve = np.loadtxt(f, delimiter=",")  # altitude (km), density (kg/m^3)
+                self.densities = sp.interpolate.make_interp_spline(
+                    density_curve[:, 0].squeeze(),
+                    density_curve[:, 1].squeeze(),
+                    k=3
+                )
+        else:
+            raise ValueError(f"{solar_activity} is not a valid setting, please choose from 'low', 'medium', or 'high'.")
         self.exosphere_bound = density_curve[-1, 0]
 
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.array:
