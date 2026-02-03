@@ -35,7 +35,7 @@ class Propagator:
         a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
     """
 
-    def __init__(self, step_size: float = None):
+    def __init__(self, step_size: float = 60):
         self.step_size = step_size
 
         self.satellites: Any[dict[str, spacecraft.Satellite], None] = None
@@ -70,8 +70,6 @@ class Propagator:
         self.perturbing_forces = perturbing_forces
 
         # Compute number of discrete timesteps to propagate for.
-        if self.step_size is None:  # Default to once a minute if the user didn't input a value.
-            self.step_size = 60
         self.timesteps = int(np.floor(runtime / self.step_size))
 
     def log(self, timestep):

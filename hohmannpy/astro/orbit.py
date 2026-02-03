@@ -278,7 +278,7 @@ class Orbit:
             Call to the base initialization function for this class.
         """
 
-        position, velocity = conversions.classic_elements_2_state_p(
+        position, velocity = conversions.classical_2_state_p(
             sl_rectum=sl_rectum,
             eccentricity=eccentricity,
             raan=raan,
