@@ -23,8 +23,8 @@ class NonSphericalEarth(base.Perturbation):
     ----------
     degree : int
         Maximum degree of harmonics to include.
-    gmst : float
-        Current angle of the Greenwich meridian in :math:`rad`.
+    initial_gmst : float
+        Initial angle of the Greenwich meridian in :math:`rad`.
     zonal : bool
         Disable sectoral and tesseral harmonics to only look at zonal ones (such as J2). Does this by capping the
         maximum order summed to when computing the acceleration terms to 0.
@@ -54,12 +54,12 @@ class NonSphericalEarth(base.Perturbation):
     3) The GMST of the Earth is initially accurately computed wrt. the Vernal equinox (ignoring nutation) and is then said to linearly rotate at the Earth's mean rotation rate without precession.
     """
 
-    def __init__(self, degree: int, gmst: float, zonal: bool = False):
+    def __init__(self, degree: int, initial_gmst: float, zonal: bool = False):
         super().__init__()
 
         self.degree = degree
         self.zonal = zonal
-        self.initial_gmst = gmst
+        self.initial_gmst = initial_gmst
 
         # Import the harmonic coefficients.
         with importlib.resources.files("hohmannpy.resources").joinpath("egm84_c_coeffs.csv").open() as f:

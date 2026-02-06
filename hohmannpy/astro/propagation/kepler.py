@@ -43,7 +43,7 @@ class KeplerPropagator(base.Propagator):
 
     def __init__(
             self,
-            step_size: float = None,
+            step_size: float = 60,
             solver_tol: float = 1e-8,
             fg_constraint: bool = True
     ):

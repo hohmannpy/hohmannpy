@@ -319,6 +319,9 @@ class RenderEngine:
         return gfx.Line(gfx.Geometry(positions=orbit), gfx.LineMaterial(thickness=2, color=gfx.Color(color)))
 
 
+# TODO:
+#  - Update documentation to include groundtrack.
+#  - Satellites move along groundtracks.
 class DynamicRenderEngine(RenderEngine):
     r"""
     An extension of :class:`~hohmannpy.ui.RenderEngine` which renders satellites which move along the simulated orbits.
@@ -381,6 +384,7 @@ class DynamicRenderEngine(RenderEngine):
             initial_global_time: astro.Time,
             draw_basis: bool = False,
             draw_skybox: bool = True,
+            draw_groundtracks: bool = True,
     ):
         # Base installation.
         super().__init__(satellites, draw_basis, draw_skybox)
@@ -420,6 +424,12 @@ class DynamicRenderEngine(RenderEngine):
         # Add additional event handling.
         self.canvas.add_event_handler(self.time_event_handler, "key_down")
 
+        # If using UI (currently just groundtracks).
+        self.draw_groundtracks = draw_groundtracks
+        if self.draw_groundtracks:
+            self.gt_engine = GroundtrackRenderEngine(satellites, initial_global_time)
+
+
     def animate(self):
         r"""
         See :class:`~hohmannpy.ui.RenderEngine` . :meth:`~hohmannpy.ui.RenderEngine.animate()`. This simply adds in
@@ -448,7 +458,10 @@ class DynamicRenderEngine(RenderEngine):
         for i in range(len(self.satellites)):
             self.satellites[i].local.position = self.orbit_splines[i](self.sim_time)
 
-        super().animate()
+        self.camera.orient()
+        self.renderer.render(self.scene, self.camera)
+
+        self.canvas.request_draw(self.animate)
 
     def render(self):
         r"""
@@ -458,6 +471,8 @@ class DynamicRenderEngine(RenderEngine):
         self.initial_local_time = time.perf_counter()
         self.local_time = self.initial_local_time
 
+        if self.draw_groundtracks:
+            self.gt_engine.render()
         super().render()
 
     def time_event_handler(self, event):
@@ -511,3 +526,57 @@ class DynamicRenderEngine(RenderEngine):
         )
 
         return satellite
+
+# TODO:
+#  - Documentation for this class.
+#  - (Potentially) Split up groundtracks into a series of lines to prevent wrapping issues.
+class GroundtrackRenderEngine:
+    def __init__(self, satellites, initial_global_time):
+
+        self.canvas = rendercanvas.auto.RenderCanvas(size=(640, 320), title="HohmannPy (Groundtrack Viewer)")
+        self.renderer = gfx.renderers.WgpuRenderer(self.canvas)
+        self.scene = gfx.Scene()
+
+        with importlib.resources.files("hohmannpy.resources").joinpath("earth_texture_map.jpg").open("rb") as f:
+            earth_img = iio.imread(f)
+            earth_img = np.ascontiguousarray(np.flipud(earth_img))  # Need to flip array.
+            img_height, img_width = earth_img.shape[:2]
+        earth_img = gfx.Image(
+            gfx.Geometry(grid=gfx.Texture(earth_img, dim=2)),
+            gfx.ImageBasicMaterial(clim=(0, 255)),
+        )
+        self.scene.add(earth_img)
+        earth_img.local.position = (-img_width / 2, -img_height / 2, 0)
+
+        self.groundtracks = []
+        for satellite in satellites.values():
+            groundtrack = astro.Groundtrack(satellite=satellite, initial_gmst=initial_global_time.gmst)
+            groundtrack_x = (groundtrack.longitude_history / (2 * np.pi)) * img_width - img_width / 2
+            groundtrack_y = (groundtrack.latitude_history / (np.pi / 2)) * (img_height / 2)
+            groundtrack_z = np.ones([1, groundtrack.longitude_history.shape[1]])
+
+            groundtrack_xy = np.vstack((groundtrack_x, groundtrack_y, groundtrack_z))
+            self.groundtracks.append(
+                sp.interpolate.make_interp_spline(
+                    satellite.time_history.squeeze(),
+                    groundtrack_xy.T,
+                    k=3
+                )
+            )
+            groundtrack_xy = groundtrack_xy.astype(np.float32)  # Data type needed by gfx.Geometry.
+            self.scene.add(
+                gfx.Points(
+                    gfx.Geometry(positions=groundtrack_xy.T),
+                    gfx.PointsMaterial(size=4, color=gfx.Color(satellite.color)),
+                )
+            )
+
+        self.camera = gfx.OrthographicCamera(img_width, img_height)
+        self.camera.local.position = (0, 0, 10)
+
+    def animate(self):
+        self.renderer.render(self.scene, self.camera)
+        self.canvas.request_draw(self.animate)
+
+    def render(self):
+        self.canvas.request_draw(self.animate)

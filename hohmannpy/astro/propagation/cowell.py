@@ -25,7 +25,7 @@ class CowellPropagator(base.Propagator):
 
     def __init__(
             self,
-            step_size: float = None,
+            step_size: float = 60,
     ):
         super().__init__(step_size)
 

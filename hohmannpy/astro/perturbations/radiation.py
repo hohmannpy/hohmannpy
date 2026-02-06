@@ -8,6 +8,7 @@ from .. import time, spacecraft, propagation
 from . import base
 
 
+# TODO: Add an umbral effect to account for Earth's shadow.
 class SolarRadiation(base.Perturbation):
     r"""
     Perturbation caused by solar radiation from the Sun.

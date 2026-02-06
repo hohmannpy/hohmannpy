@@ -40,7 +40,7 @@ class UniversalVariablePropagator(base.Propagator):
 
     def __init__(
             self,
-            step_size: float = None,
+            step_size: float = 60,
             solver_tol: float = 1e-8,
             stumpff_tol: float = 1e-8,
             stumpff_series_length: int = 10,
