@@ -12,7 +12,6 @@ from ... import astro
 
 # TODO:
 #  - Documentation.
-#  - Can control sim speed from groundtrack window.
 class GroundtrackRenderEngine:
     def __init__(self, satellites, initial_global_time, *, _dynamic):
 
