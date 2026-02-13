@@ -185,7 +185,7 @@ class LunarGravity(ThirdBodyGravity):
     r"""
     Perturbation caused by the Moon's gravity.
 
-    This class implements a specialized version of :class:`~hohmannpy.astro.perturbations.ThirdBodyGravity` adjusted to
+    This class implements a specialized version of :class:`~hohmannpy.astro.ThirdBodyGravity` adjusted to
     specifically account for the third body perturbations due to the Earth's moon.
 
     Parameters
@@ -239,7 +239,7 @@ class SolarGravity(ThirdBodyGravity):
     r"""
     Perturbation caused by the Sun's gravity.
 
-    This class implements a specialized version of :class:`~hohmannpy.astro.perturbations.ThirdBodyGravity` adjusted to
+    This class implements a specialized version of :class:`~hohmannpy.astro.ThirdBodyGravity` adjusted to
     specifically account for the third body perturbations due to the Sun. The true anomaly of the Earth wrt. to the
     ecliptic plane is computed automatically based on the dates of desired propagation.
 

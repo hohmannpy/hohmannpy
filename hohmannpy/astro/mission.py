@@ -119,13 +119,15 @@ class Mission:
         Propagate the orbits of all stored ``Satellite``.
         """
 
+        # Propagation uses units of seconds, so convert Gregorian/UT1 -> Julian Date -> seconds.
         runtime = (self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400
+
         if self.cores == 1:
             self.propagator.propagate(
                 satellites=self.satellites,
                 runtime=runtime,
                 perturbing_forces=self.perturbing_forces,
-            )  # Propagation uses units of seconds, so convert Gregorian/UT1 -> Julian Date -> seconds.
+            )
         else:
             satellites_per_core = int(np.floor(len(self.satellites.items()) / self.cores))
             if satellites_per_core == 0:
@@ -156,7 +158,7 @@ class Mission:
             satellites=satellites,
             runtime=runtime,
             perturbing_forces=perturbing_forces,
-        )  # Propagation uses units of seconds, so convert Gregorian/UT1 -> Julian Date -> seconds.
+        )
 
         return satellites
 
