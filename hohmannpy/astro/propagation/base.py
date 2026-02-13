@@ -72,11 +72,10 @@ class Propagator:
         # Compute number of discrete timesteps to propagate for.
         self.timesteps = int(np.floor(runtime / self.step_size))
 
-    def log(self, timestep):
+    def log(self, satellite: spacecraft.Satellite, timestep: int):
         r"""
         For every satellite being propagated access their stored :class:`~hohmannpy.astro.Logger`'s and log data.
         """
 
-        for satellite in self.satellites.values():
-            for logger in satellite.loggers:
-                logger.log(current_orbit=satellite.orbit, timestep=timestep)
+        for logger in satellite.loggers:
+            logger.log(current_orbit=satellite.orbit, timestep=timestep)

@@ -76,8 +76,8 @@ class CowellPropagator(base.Propagator):
                 if orbit.track_equinoctial:
                     orbit.update_equinoctial()
 
-            # Save results from this timestep.
-            self.log(timestep)
+                # Save results from this timestep.
+                self.log(satellite, timestep)
 
     def eom(
             self,

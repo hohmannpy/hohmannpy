@@ -97,11 +97,15 @@ class Satellite:
         Access data from ``Loggers`` assigned to this object as if they were assigned to this class.
         """
 
-        if self.loggers is not None:
-            for logger in self.loggers:
+        # Need a safeguard here because can't call self.(some attribute) inside __getattr__() because this can break
+        # during the pickling which occurs during parallel processing..
+        loggers = object.__getattribute__(self, "__dict__").get("loggers", None)
+
+        if loggers is not None:
+            for logger in loggers:
                 if hasattr(logger, name):
                     return getattr(logger, name)
-        raise AttributeError(f"This satellite has not logged data for {self.name}.")
+        raise AttributeError(f"This satellite has not logged data for {name}.")
 
 
 class Moon(Satellite):

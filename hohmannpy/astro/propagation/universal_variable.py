@@ -163,8 +163,8 @@ class UniversalVariablePropagator(base.Propagator):
                 # Compute the new velocity.
                 orbit.velocity = fdot_func * initial_positions[name] + gdot_func * initial_velocities[name]
 
-            # Save results from this timestep.
-            self.log(timestep)
+                # Save results from this timestep.
+                self.log(satellite, timestep)
 
     def stumpff_funcs(self, stumpff_param) -> tuple[float, float]:
         r"""

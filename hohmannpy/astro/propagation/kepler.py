@@ -45,10 +45,15 @@ class KeplerPropagator(base.Propagator):
             self,
             step_size: float = 60,
             solver_tol: float = 1e-8,
-            fg_constraint: bool = True
+            fg_constraint: bool = True,
     ):
         self.fg_constraint = fg_constraint
         self.solver_tol = solver_tol
+
+        self.initial_times = {}
+        self.initial_positions = {}
+        self.initial_velocities = {}
+        self.initial_eccentric_anomalies = {}
 
         super().__init__(step_size)
 
@@ -78,25 +83,20 @@ class KeplerPropagator(base.Propagator):
         # Get initial values used for propagation and set up logging capabilities. This involves iterating through each
         # satellite and extracting attributes of their orbits. Like the satellites themselves these are stored as
         # dictionaries where the satellite name is the key and the property itself is the value.
-        initial_times = {}
-        initial_positions = {}
-        initial_velocities = {}
-        initial_eccentric_anomalies = {}
-
         for name, satellite in self.satellites.items():
-            initial_times[name] = satellite.orbit.time
-            initial_positions[name] = satellite.orbit.position.copy()  # Copy to prevent mutation.
-            initial_velocities[name] = satellite.orbit.velocity.copy()
+            self.initial_times[name] = satellite.orbit.time
+            self.initial_positions[name] = satellite.orbit.position.copy()  # Copy to prevent mutation.
+            self.initial_velocities[name] = satellite.orbit.velocity.copy()
 
             # Run Gauss' equation to get the initial eccentric anomaly of each orbit. This is needed so that logging can
             # being because the user might have passed astro.EccentricAnomalyLogger().
-            initial_eccentric_anomalies[name] = (
+            self.initial_eccentric_anomalies[name] = (
                 self.gauss_equation(
                     eccentricity=satellite.orbit.eccentricity,
                     true_anomaly=satellite.orbit.true_anomaly
                 )
             )
-            satellite.orbit.eccentric_anomaly = initial_eccentric_anomalies[name]
+            satellite.orbit.eccentric_anomaly = self.initial_eccentric_anomalies[name]
 
             # Setup the loggers.
             for logger in satellite.loggers:
@@ -107,7 +107,7 @@ class KeplerPropagator(base.Propagator):
         # its eccentricity. The form of Kepler's equation and the f and g functions changes based on this. Next, use
         # Kepler's equation to solve for the eccentric anomaly at the next timestep, and then use that to form the f and
         # g functions and their derivatives. These can be used to construct the position and velocity.
-        for timestep in range(1, self.timesteps + 1):
+        for timestep in range(self.timesteps):
             for name, satellite in self.satellites.items():
                 orbit = satellite.orbit
                 orbit.time += self.step_size
@@ -123,27 +123,27 @@ class KeplerPropagator(base.Propagator):
                         eccentricity=orbit.eccentricity,
                         sm_axis=orbit.sm_axis,
                         grav_param=orbit.grav_param,
-                        initial_eccentric_anomaly=initial_eccentric_anomalies[name],
+                        initial_eccentric_anomaly=self.initial_eccentric_anomalies[name],
                         initial_guess=orbit.eccentric_anomaly,
-                        initial_time=initial_times[name]
+                        initial_time=self.initial_times[name]
                     )
 
                     # Compute the f and g functions.
                     f_func = (
-                            1 - orbit.sm_axis / np.linalg.norm(initial_positions[name])
-                                * (1 - np.cos(orbit.eccentric_anomaly - initial_eccentric_anomalies[name]))
+                            1 - orbit.sm_axis / np.linalg.norm(self.initial_positions[name])
+                            * (1 - np.cos(orbit.eccentric_anomaly - self.initial_eccentric_anomalies[name]))
                     )
                     g_func = (
-                            orbit.time - initial_times[name]
-                                - 1 / np.sqrt(orbit.grav_param / orbit.sm_axis ** 3)
-                                * (orbit.eccentric_anomaly - initial_eccentric_anomalies[name]
-                                    - np.sin(orbit.eccentric_anomaly - initial_eccentric_anomalies[name]))
+                            orbit.time - self.initial_times[name]
+                            - 1 / np.sqrt(orbit.grav_param / orbit.sm_axis ** 3)
+                            * (orbit.eccentric_anomaly - self.initial_eccentric_anomalies[name]
+                               - np.sin(orbit.eccentric_anomaly - self.initial_eccentric_anomalies[name]))
                     )
 
                     # Compute new position (and true anomaly). Only need to update fast variables because the other
                     # orbital elements are constant for Keplerian orbits.
                     orbit.position = (
-                            f_func * initial_positions[name] + g_func * initial_velocities[name]
+                            f_func * self.initial_positions[name] + g_func * self.initial_velocities[name]
                     )
                     orbit.update_true_anomaly()
                     orbit.update_argl()
@@ -151,16 +151,16 @@ class KeplerPropagator(base.Propagator):
 
                     # Compute fdot and gdot functions.
                     fdot_func = (
-                        -np.sqrt(orbit.grav_param * orbit.sm_axis)
-                            / (np.linalg.norm(initial_positions[name]) * np.linalg.norm(orbit.position))
-                            * np.sin(orbit.eccentric_anomaly - initial_eccentric_anomalies[name])
+                            -np.sqrt(orbit.grav_param * orbit.sm_axis)
+                            / (np.linalg.norm(self.initial_positions[name]) * np.linalg.norm(orbit.position))
+                            * np.sin(orbit.eccentric_anomaly - self.initial_eccentric_anomalies[name])
                     )
                     if self.fg_constraint:  # Only compute gdot function manually if constraint usage is disabled.
                         gdot_func = (g_func * fdot_func + 1) / f_func
                     else:
                         gdot_func = (
                                 1 - orbit.sm_axis / np.linalg.norm(orbit.position)
-                                    * (1 - np.cos(orbit.eccentric_anomaly - initial_eccentric_anomalies[name]))
+                                * (1 - np.cos(orbit.eccentric_anomaly - self.initial_eccentric_anomalies[name]))
                         )
 
                 # ---------------
@@ -174,24 +174,24 @@ class KeplerPropagator(base.Propagator):
                         eccentricity=orbit.eccentricity,
                         sm_axis=orbit.sm_axis,
                         grav_param=orbit.grav_param,
-                        initial_eccentric_anomaly=initial_eccentric_anomalies[name],
+                        initial_eccentric_anomaly=self.initial_eccentric_anomalies[name],
                         initial_guess=orbit.eccentric_anomaly,
-                        initial_time=initial_times[name]
+                        initial_time=self.initial_times[name]
                     )
 
                     f_func = (
-                            1 - orbit.sm_axis / np.linalg.norm(initial_positions[name])
-                                * (1 - np.cosh(orbit.eccentric_anomaly - initial_eccentric_anomalies[name]))
+                            1 - orbit.sm_axis / np.linalg.norm(self.initial_positions[name])
+                            * (1 - np.cosh(orbit.eccentric_anomaly - self.initial_eccentric_anomalies[name]))
                     )
                     g_func = (
-                            orbit.time - initial_times[name]
-                                - 1 / np.sqrt(orbit.grav_param / (-orbit.sm_axis) ** 3)
-                                * (np.sinh(orbit.eccentric_anomaly - initial_eccentric_anomalies[name])
-                                    - (orbit.eccentric_anomaly - initial_eccentric_anomalies[name]))
+                            orbit.time - self.initial_times[name]
+                            - 1 / np.sqrt(orbit.grav_param / (-orbit.sm_axis) ** 3)
+                            * (np.sinh(orbit.eccentric_anomaly - self.initial_eccentric_anomalies[name])
+                               - (orbit.eccentric_anomaly - self.initial_eccentric_anomalies[name]))
                     )
 
                     orbit.position = (
-                            f_func * initial_positions[name] + g_func * initial_velocities[name]
+                            f_func * self.initial_positions[name] + g_func * self.initial_velocities[name]
                     )
                     orbit.update_true_anomaly()
                     orbit.update_argl()
@@ -199,24 +199,32 @@ class KeplerPropagator(base.Propagator):
 
                     fdot_func = (
                             -np.sqrt(orbit.grav_param * -orbit.sm_axis)
-                            / (np.linalg.norm(initial_positions[name]) * np.linalg.norm(orbit.position))
-                            * np.sinh(orbit.eccentric_anomaly - initial_eccentric_anomalies[name])
+                            / (np.linalg.norm(self.initial_positions[name]) * np.linalg.norm(orbit.position))
+                            * np.sinh(orbit.eccentric_anomaly - self.initial_eccentric_anomalies[name])
                     )
                     if self.fg_constraint:
                         gdot_func = (g_func * fdot_func + 1) / f_func
                     else:
                         gdot_func = (
                                 1 - orbit.sm_axis / np.linalg.norm(orbit.position)
-                                * (1 - np.cosh(orbit.eccentric_anomaly - initial_eccentric_anomalies[name]))
+                                * (1 - np.cosh(orbit.eccentric_anomaly - self.initial_eccentric_anomalies[name]))
                         )
 
                 # Compute the new velocity.
                 orbit.velocity = (
-                        fdot_func * initial_positions[name] + gdot_func * initial_velocities[name]
+                        fdot_func * self.initial_positions[name] + gdot_func * self.initial_velocities[name]
                 )
 
-            # Save results from this timestep.
-            self.log(timestep)
+                # Save results from this timestep.
+                self.log(satellite, timestep)
+
+    def step(self, name: str, satellite: spacecraft.Satellite, timestep: int):
+        """
+        One step of the propagation loop.
+        """
+
+
+
 
     def gauss_equation(self, eccentricity: float, true_anomaly: float) -> float:
         r"""

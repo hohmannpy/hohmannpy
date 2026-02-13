@@ -1,5 +1,6 @@
 from __future__ import annotations
 import copy
+import concurrent.futures
 
 import pandas as pd
 import numpy as np
@@ -8,6 +9,7 @@ from . import propagation, perturbations, time, logging, spacecraft
 from ..ui import rendering
 
 
+# TODO: Update to include groundtracks and parallel computing in documentation.
 class Mission:
     r"""
     Master class for all orbital simulations.
@@ -60,12 +62,14 @@ class Mission:
             loggers: list[logging.Logger] = None,
             propagator: propagation.base.Propagator = None,
             perturbing_forces: list[perturbations.Perturbation] = None,
+            cores: int = 1
     ):
         # Instantiate all the passed-in attributes.
         self.perturbing_forces: list[perturbations.Perturbation] = perturbing_forces
         self.initial_global_time: time.Time = initial_global_time
         self.final_global_time: time.Time = final_global_time
         self.global_time: time.Time = initial_global_time
+        self.cores: int = cores
 
         # If the user did not pass in a propagator we need to assign one for them. If no perturbations are used we can
         # use the best-in-class Keplerian propagator, UniversalVariablePropagator(). If a perturbation is used instead
@@ -115,11 +119,46 @@ class Mission:
         Propagate the orbits of all stored ``Satellite``.
         """
 
-        self.propagator.propagate(
-            satellites=self.satellites,
-            perturbing_forces=self.perturbing_forces,
-            runtime=(self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400,
+        runtime = (self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400
+        if self.cores == 1:
+            self.propagator.propagate(
+                satellites=self.satellites,
+                runtime=runtime,
+                perturbing_forces=self.perturbing_forces,
+            )  # Propagation uses units of seconds, so convert Gregorian/UT1 -> Julian Date -> seconds.
+        else:
+            satellites_per_core = int(np.floor(len(self.satellites.items()) / self.cores))
+            if satellites_per_core == 0:
+                raise ValueError("If M cores are assigned there must be N satellites to simulate, where N >= M.")
+
+            core_group = {}
+            core_groups = []
+            for name, satellite in self.satellites.items():
+                core_group[name] = satellite
+                if len(core_group) == satellites_per_core:
+                    core_groups.append(core_group.copy())
+                    core_group = {}
+            if core_group:
+                core_groups.append(core_group.copy())
+
+            with concurrent.futures.ProcessPoolExecutor(max_workers=self.cores) as executor:
+                for core_group in executor.map(
+                        Mission._parallel_propagate,
+                        [(self.propagator, core_group, runtime, self.perturbing_forces) for core_group in core_groups]
+                ):
+                    for name, satellite in core_group.items():
+                        self.satellites[name] = satellite
+
+    @staticmethod
+    def _parallel_propagate(args):
+        propagator, satellites, runtime, perturbing_forces = args
+        propagator.propagate(
+            satellites=satellites,
+            runtime=runtime,
+            perturbing_forces=perturbing_forces,
         )  # Propagation uses units of seconds, so convert Gregorian/UT1 -> Julian Date -> seconds.
+
+        return satellites
 
     def display(self, display_flag = "dynamic"):
         r"""
@@ -135,11 +174,19 @@ class Mission:
             rendering will launch. Otherwise, a static rendering will be used.
         """
 
-        if display_flag == "dynamic":
+        if display_flag == "dynamic-groundtracks":
             engine = rendering.DynamicRenderEngine(
                 satellites=self.satellites,
                 runtime=(self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400,
                 initial_global_time=self.initial_global_time,
+                draw_groundtracks=True
+            )
+        elif display_flag == "dynamic":
+            engine = rendering.DynamicRenderEngine(
+                satellites=self.satellites,
+                runtime=(self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400,
+                initial_global_time=self.initial_global_time,
+                draw_groundtracks=False
             )
         else:
             engine = rendering.RenderEngine(

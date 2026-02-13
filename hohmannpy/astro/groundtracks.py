@@ -41,6 +41,4 @@ class Groundtrack:
             self.latitude_history[0, i] = x
 
             longitude = np.arctan2(position[1], position[0])
-            if longitude < 0:
-                longitude += 2 * np.pi
             self.longitude_history[0, i] = longitude
