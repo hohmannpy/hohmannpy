@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from .. import spacecraft, perturbations
 
 
+# TODO: Document burn logic.
 class KeplerPropagator(base.Propagator):
     r"""
     Propagates orbits using an f and g functions as well as Kepler's equation.
@@ -111,38 +112,42 @@ class KeplerPropagator(base.Propagator):
         # For each satellite,
         for timestep in range(self.timesteps):
             for name, satellite in self.satellites.items():
-                if satellite.burns is not None and satellite.burn_index < len(satellite.burns):
-                    burn = satellite.burns[satellite.burn_index]
+                if satellite.burns is not None:
+                    next_std_time = satellite.orbit.time + self.step_size
 
-                    if satellite.orbit.time + self.step_size > burn.start_time:
-                        next_std_time = satellite.orbit.time + self.step_size
-                        satellite.orbit.time = burn.start_time
+                    while True:
+                        if satellite.burn_index < len(satellite.burns):
+                            burn = satellite.burns[satellite.burn_index]
+                        else:
+                            break
 
-                        self.step(name, satellite, timestep)
+                        if next_std_time >= burn.start_time:
+                            satellite.orbit.time = burn.start_time
 
-                        burn.evaluate(satellite)
+                            self.step(name, satellite, timestep)
 
-                        self.initial_times[name] = satellite.orbit.time
-                        self.initial_positions[name] = satellite.orbit.position.copy()
-                        self.initial_velocities[name] = satellite.orbit.velocity.copy()
-                        self.initial_eccentric_anomalies[name] = (
-                            self.gauss_equation(
-                                eccentricity=satellite.orbit.eccentricity,
-                                true_anomaly=satellite.orbit.true_anomaly
+                            burn.evaluate(satellite)
+                            satellite.orbit.update_classical()
+                            if satellite.orbit.track_equinoctial:
+                                satellite.orbit.update_equinoctial()
+
+                            self.initial_times[name] = satellite.orbit.time
+                            self.initial_positions[name] = satellite.orbit.position.copy()
+                            self.initial_velocities[name] = satellite.orbit.velocity.copy()
+                            self.initial_eccentric_anomalies[name] = (
+                                self.gauss_equation(
+                                    eccentricity=satellite.orbit.eccentricity,
+                                    true_anomaly=satellite.orbit.true_anomaly
+                                )
                             )
-                        )
-                        satellite.orbit.eccentric_anomaly = self.initial_eccentric_anomalies[name]
+                            satellite.orbit.eccentric_anomaly = self.initial_eccentric_anomalies[name]
 
-                        satellite.orbit.update_classical()
-                        if satellite.orbit.track_equinoctial:
-                            satellite.orbit.update_equinoctial()
-                        self.log(satellite)
+                            self.log(satellite)
+                        else:
+                            break
 
-                        satellite.orbit.time = next_std_time
-                        self.step(name, satellite, timestep)
-                    else:
-                        satellite.orbit.time += self.step_size
-                        self.step(name, satellite, timestep)
+                    satellite.orbit.time = next_std_time
+                    self.step(name, satellite, timestep)
                 else:
                     satellite.orbit.time += self.step_size
                     self.step(name, satellite, timestep)

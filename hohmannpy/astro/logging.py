@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from . import orbit
 
 
-# TODO: Update to account for burns.
+# TODO: Update documentation to account for burns.
 class Logger(ABC):
     r"""
     A logger is used to store data regarding a :class:`~hohmannpy.astro.Orbit` generated on each timestep by

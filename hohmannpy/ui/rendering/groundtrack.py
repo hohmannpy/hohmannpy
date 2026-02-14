@@ -45,9 +45,14 @@ class GroundtrackRenderEngine:
 
             unwrapped_groundtrack_xy = np.vstack((unwrapped_groundtrack_x, groundtrack_y, groundtrack_z))
             wrapped_groundtrack_xy = np.vstack((wrapped_groundtrack_x, groundtrack_y, groundtrack_z))
+
+            # If there were any impulsive burns their wil be two entries with the same time which breaks
+            # scipy.make_interp_spline(). To resolve use numpy.where() to find duplicate times and add 1 ns to them.
             times = satellite.time_history.squeeze().copy()
-            dup = np.where(np.diff(times) == 0)[0]
-            times[dup + 1] += 1e-9  # nanosecond shift is plenty
+            for i in range(1, len(times)):
+                if times[i] <= times[i - 1]:
+                    times[i] = times[i - 1] + 1e-9
+
             self.groundtracks.append(
                 sp.interpolate.make_interp_spline(
                     times,

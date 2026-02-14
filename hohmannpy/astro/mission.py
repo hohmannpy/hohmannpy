@@ -1,6 +1,7 @@
 from __future__ import annotations
 import copy
 import concurrent.futures
+from typing import Optional
 
 import pandas as pd
 import numpy as np
@@ -59,9 +60,9 @@ class Mission:
             satellites: list[spacecraft.Satellite],
             initial_global_time: time.Time,
             final_global_time: time.Time,
-            loggers: list[logging.Logger] = None,
-            propagator: propagation.base.Propagator = None,
-            perturbing_forces: list[perturbations.Perturbation] = None,
+            loggers: Optional[list[logging.Logger]] = None,
+            propagator: Optional[propagation.base.Propagator] = None,
+            perturbing_forces: Optional[list[perturbations.Perturbation]] = None,
             cores: int = 1
     ):
         # Instantiate all the passed-in attributes.
