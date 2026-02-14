@@ -12,14 +12,13 @@ from ... import astro
 
 # TODO:
 #  - Documentation.
-#  - Also likely pending an overhaul to make multiple renders possible at once.
+#  - Overhaul of UI.
 class GroundtrackRenderEngine:
-    def __init__(self, satellites, initial_global_time, *, _dynamic):
+    def __init__(self, satellites, initial_global_time):
 
         self.canvas = rendercanvas.auto.RenderCanvas(size=(640, 320), title="HohmannPy (Groundtrack Viewer)")
         self.renderer = gfx.renderers.WgpuRenderer(self.canvas)
         self.scene = gfx.Scene()
-        self._dynamic = _dynamic
 
         self.sim_time = 0
 
@@ -36,10 +35,7 @@ class GroundtrackRenderEngine:
         earth_img.local.position = (-img_width / 2, -img_height / 2, 0)
 
         self.groundtracks = []
-
-        if self._dynamic:
-            self.satellite_icons = []
-
+        self.satellite_icons = []
         for satellite in satellites.values():
             groundtrack = astro.Groundtrack(satellite=satellite, initial_gmst=initial_global_time.gmst)
             wrapped_groundtrack_x = img_width / (2 * np.pi) * groundtrack.longitude_history
@@ -49,11 +45,14 @@ class GroundtrackRenderEngine:
 
             unwrapped_groundtrack_xy = np.vstack((unwrapped_groundtrack_x, groundtrack_y, groundtrack_z))
             wrapped_groundtrack_xy = np.vstack((wrapped_groundtrack_x, groundtrack_y, groundtrack_z))
+            times = satellite.time_history.squeeze().copy()
+            dup = np.where(np.diff(times) == 0)[0]
+            times[dup + 1] += 1e-9  # nanosecond shift is plenty
             self.groundtracks.append(
                 sp.interpolate.make_interp_spline(
-                    satellite.time_history.squeeze(),
+                    times,
                     unwrapped_groundtrack_xy.T,
-                    k=3
+                    k=1
                 )
             )
             wrapped_groundtrack_xy = wrapped_groundtrack_xy.astype(np.float32)  # Data type needed by gfx.Geometry.
@@ -63,32 +62,29 @@ class GroundtrackRenderEngine:
                     gfx.PointsMaterial(size=4, color=gfx.Color(satellite.color)),
                 )
             )
-
-            if self._dynamic:
-                satellite_icon = gfx.Points(
-                        gfx.Geometry(positions=np.array([[0, 0, 0]], dtype=np.float32)),
-                        gfx.PointsMaterial(size=20, color=gfx.Color(satellite.color)),
-                    )
-                self.scene.add(satellite_icon)
-                self.satellite_icons.append(
-                    satellite_icon
+            satellite_icon = gfx.Points(
+                    gfx.Geometry(positions=np.array([[0, 0, 0]], dtype=np.float32)),
+                    gfx.PointsMaterial(size=20, color=gfx.Color(satellite.color)),
                 )
+            self.scene.add(satellite_icon)
+            self.satellite_icons.append(
+                satellite_icon
+            )
 
         self.camera = gfx.OrthographicCamera(img_width, img_height)
         self.camera.local.position = (0, 0, 10)
 
     def animate(self):
-        if self._dynamic:
-            for i in range(len(self.satellite_icons)):
-                x_position, y_position, _ = self.groundtracks[i](self.sim_time)
-                x_position = (x_position + self.pixel_wrap / 2) % self.pixel_wrap - self.pixel_wrap / 2
+        for i in range(len(self.satellite_icons)):
+            x_position, y_position, _ = self.groundtracks[i](self.sim_time)
+            x_position = (x_position + self.pixel_wrap / 2) % self.pixel_wrap - self.pixel_wrap / 2
 
 
-                self.satellite_icons[i].local.position = (
-                    x_position,
-                    y_position,
-                    1
-                )
+            self.satellite_icons[i].local.position = (
+                x_position,
+                y_position,
+                1
+            )
 
         self.renderer.render(self.scene, self.camera)
         self.canvas.request_draw(self.animate)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import copy
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import scipy as sp
@@ -8,9 +8,10 @@ import scipy as sp
 from . import orbit, logging
 
 if TYPE_CHECKING:
-    from . import time
+    from . import time, maneuvers
 
 
+# TODO: Update to include burns.
 class Satellite:
     r"""
     Basic spacecraft whose motion can be simulated using :class:`~hohmannpy.astro.Mission`.
@@ -76,21 +77,26 @@ class Satellite:
             name: str,
             starting_orbit: orbit.Orbit,
             color: str = "#FF073A",
+            burns: Optional[list[Union[maneuvers.ImpulsiveBurn, maneuvers.ContinuousBurn]]] = None,
             mass: float = None,
             ballistic_coeff: float = None,
             mean_reflective_area: float = None,
-            reflectivity: float = None,
+            reflectivity: float = None
     ):
         self.name = name
         self.starting_orbit = starting_orbit
+        self.color = color
+        self.burns = burns
+        self.burn_index = 0
+
+        # Perturbation-specific parameters.
         self.mass = mass
         self.ballistic_coeff = ballistic_coeff
         self.mean_reflective_area = mean_reflective_area
         self.reflectivity = reflectivity
-        self.color = color
 
         self.orbit: orbit.Orbit = copy.deepcopy(starting_orbit)  # This will be updated over time by the propagator.
-        self.loggers: Any[list[logging.Logger], None] = None  # Filled in by the __init__() of Mission.
+        self.loggers: Optional[list[logging.Logger]] = None  # Filled in by the __init__() of Mission.
 
     def __getattr__(self, name):
         r"""
@@ -98,7 +104,7 @@ class Satellite:
         """
 
         # Need a safeguard here because can't call self.(some attribute) inside __getattr__() because this can break
-        # during the pickling which occurs during parallel processing..
+        # during the pickling which occurs during parallel processing.
         loggers = object.__getattribute__(self, "__dict__").get("loggers", None)
 
         if loggers is not None:

@@ -95,11 +95,15 @@ class DynamicRenderEngine(base.RenderEngine):
         self.orbit_splines = []
         self.satellites = []
         for satellite in satellites.values():
+            times = satellite.time_history.squeeze().copy()
+            dup = np.where(np.diff(times) == 0)[0]
+            times[dup + 1] += 1e-9  # nanosecond shift is plenty
+
             self.orbit_splines.append(
                 sp.interpolate.make_interp_spline(
-                    satellite.time_history.squeeze(),
+                    times,
                     satellite.position_history.T / 1000,
-                    k=3
+                    k=1
                 )
             )
             self.satellites.append(self.create_satellite(satellite.color))
@@ -118,7 +122,7 @@ class DynamicRenderEngine(base.RenderEngine):
         # If using UI (currently just groundtracks).
         self.draw_groundtracks = draw_groundtracks
         if self.draw_groundtracks:
-            self.gt_engine = groundtrack.GroundtrackRenderEngine(satellites, initial_global_time, _dynamic=True)
+            self.gt_engine = groundtrack.GroundtrackRenderEngine(satellites, initial_global_time)
 
 
     def animate(self):

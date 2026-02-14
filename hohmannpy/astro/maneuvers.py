@@ -1,46 +1,55 @@
 from __future__ import annotations
-from typing import Callable, TYPE_CHECKING
+from typing import Union, Callable, TYPE_CHECKING
 
 import numpy as np
 
 from . import perturbations
 
 if TYPE_CHECKING:
-    from . import spacecraft
+    from . import spacecraft, time
 
 
+# TODO: Documentation.
 class ImpulsiveBurn:
-    def __init__(self, burn_time, velocity_change):
-        self.burn_time = burn_time
+    def __init__(
+            self,
+            start_time: Union[float, time.Time],
+            velocity_change: np.ndarray,
+    ):
+        if isinstance(start_time, float):
+            if start_time < 0:
+                raise ValueError("Burns may only be scheduled for after the start of the mission.")
+
+        self.start_time = start_time
         self.velocity_change = velocity_change
 
     def evaluate(self, satellite):
         satellite.orbit.velocity += self.velocity_change
+        satellite.burn_index += 1
+
 
 class ContinuousBurn(perturbations.Perturbation):
     def __init__(self, burn_profile: Callable):
         super().__init__()
-
-        self.burn_profile = burn_profile
-
-    @staticmethod
-    def constant_2_burn():
-        pass
-
-    @staticmethod
-    def arrays_2_burn():
-        pass
-
-    @staticmethod
-    def function_2_burn():
-        pass
-
-    @staticmethod
-    def csv_2_burn():
-        pass
-
-
+#
+#         self.burn_profile = burn_profile
+#
+#     @staticmethod
+#     def constant_2_burn():
+#         pass
+#
+#     @staticmethod
+#     def arrays_2_burn():
+#         pass
+#
+#     @staticmethod
+#     def function_2_burn():
+#         pass
+#
+#     @staticmethod
+#     def csv_2_burn():
+#         pass
+#
+#
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
-        acceleration = self.burn_profile(time)
-
-        return acceleration
+        pass

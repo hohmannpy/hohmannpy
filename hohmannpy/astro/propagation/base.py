@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
@@ -38,9 +38,9 @@ class Propagator:
     def __init__(self, step_size: float = 60):
         self.step_size = step_size
 
-        self.satellites: Any[dict[str, spacecraft.Satellite], None] = None
-        self.perturbing_forces: Any[list[perturbations.base.Perturbation], None] = None
-        self.timesteps: Any[int, None] = None
+        self.satellites: Optional[dict[str, spacecraft.Satellite]] = None
+        self.perturbing_forces: Optional[list[perturbations.base.Perturbation]] = None
+        self.timesteps: Optional[int] = None
 
     def propagate(
             self,
@@ -72,10 +72,10 @@ class Propagator:
         # Compute number of discrete timesteps to propagate for.
         self.timesteps = int(np.floor(runtime / self.step_size))
 
-    def log(self, satellite: spacecraft.Satellite, timestep: int):
+    def log(self, satellite: spacecraft.Satellite):
         r"""
         For every satellite being propagated access their stored :class:`~hohmannpy.astro.Logger`'s and log data.
         """
 
         for logger in satellite.loggers:
-            logger.log(current_orbit=satellite.orbit, timestep=timestep)
+            logger.log(current_orbit=satellite.orbit)

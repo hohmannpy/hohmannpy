@@ -5,7 +5,7 @@ import concurrent.futures
 import pandas as pd
 import numpy as np
 
-from . import propagation, perturbations, time, logging, spacecraft
+from . import propagation, perturbations, time, logging, spacecraft, maneuvers
 from ..ui import rendering
 
 
@@ -95,6 +95,20 @@ class Mission:
         for satellite in satellites:
             self.satellites[satellite.name] = satellite
             satellite.loggers = copy.deepcopy(loggers)
+
+            # Some satellites may be passed in with maneuvers scheduled. If these maneuvers are set to fire at times
+            # determined by Time objects, we now convert those to relative seconds since mission start. This couldn't be
+            # done sooner because when the Burn objects were created the start time of the mission may not have been
+            # known.
+            if satellite.burns is not None:
+                for burn in satellite.burns:
+                    if isinstance(burn, maneuvers.ImpulsiveBurn):  # Impulsive case.
+                        if isinstance(burn.start_time, time.Time):
+                            burn.start_time = (burn.start_time.julian_date - initial_global_time.julian_date) * 86400
+
+                            # Safeguard to make sure burn happens after mission start.
+                            if burn.start_time < 0:
+                                raise ValueError("Burns may only be scheduled for after the start of the mission.")
 
             # There are a bunch of optional parameters for each satellite only needed for specific perturbations. We
             # want to make sure that if a perturbation is enabled that the user has input value for all the needed
