@@ -12,6 +12,7 @@ from ... import astro
 
 # TODO:
 #  - Update documentation to include groundtrack.
+#  - Also likely pending an overhaul to make multiple renders possible at once.
 class DynamicRenderEngine(base.RenderEngine):
     r"""
     An extension of :class:`~hohmannpy.ui.RenderEngine` which renders satellites which move along the simulated orbits.

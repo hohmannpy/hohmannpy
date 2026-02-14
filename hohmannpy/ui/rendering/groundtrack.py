@@ -12,6 +12,7 @@ from ... import astro
 
 # TODO:
 #  - Documentation.
+#  - Also likely pending an overhaul to make multiple renders possible at once.
 class GroundtrackRenderEngine:
     def __init__(self, satellites, initial_global_time, *, _dynamic):
 
