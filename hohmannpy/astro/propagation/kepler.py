@@ -124,7 +124,7 @@ class KeplerPropagator(base.Propagator):
                         if next_std_time >= burn.start_time:
                             satellite.orbit.time = burn.start_time
 
-                            self.step(name, satellite, timestep)
+                            self.step(name, satellite)
 
                             burn.evaluate(satellite)
                             satellite.orbit.update_classical()
@@ -147,12 +147,13 @@ class KeplerPropagator(base.Propagator):
                             break
 
                     satellite.orbit.time = next_std_time
-                    self.step(name, satellite, timestep)
+                    self.step(name, satellite)
+
                 else:
                     satellite.orbit.time += self.step_size
-                    self.step(name, satellite, timestep)
+                    self.step(name, satellite)
 
-    def step(self, name, satellite, timestep):
+    def step(self, name, satellite):
         """
         One step in the propagation loop.
         """
