@@ -123,10 +123,10 @@ class KeplerPropagator(base.Propagator):
 
                         if next_std_time >= burn.start_time:
                             satellite.orbit.time = burn.start_time
-
                             self.step(name, satellite)
 
                             burn.evaluate(satellite)
+
                             satellite.orbit.update_classical()
                             if satellite.orbit.track_equinoctial:
                                 satellite.orbit.update_equinoctial()
@@ -198,6 +198,7 @@ class KeplerPropagator(base.Propagator):
                     f_func * self.initial_positions[name] + g_func * self.initial_velocities[name]
             )
             orbit.update_true_anomaly()
+
             orbit.update_argl()
             orbit.update_true_latitude()
 

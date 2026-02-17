@@ -28,19 +28,13 @@ class ImpulsiveBurn:
 
     def evaluate(self, satellite):
         if not self.inertial:
-            true_anomaly = satellite.orbit.true_anomaly
-            inclination = satellite.orbit.inclination
-            argp = satellite.orbit.argp
-            raan = satellite.orbit.raan
+            radial_uvec = satellite.orbit.position / np.linalg.norm(satellite.orbit.position)
+            normal_uvec = satellite.orbit.spf_angular_momentum / np.linalg.norm(satellite.orbit.spf_angular_momentum)
+            transverse_uvec = np.cross(normal_uvec, radial_uvec)
 
-            inertial_2_sat_dcm = (
-                dcms.euler_2_dcm(raan, 3)
-                    @ dcms.euler_2_dcm(inclination, 1)
-                    @ dcms.euler_2_dcm(argp, 3)
-                    @ dcms.euler_2_dcm(true_anomaly, 3)
-            )
-
-            velocity_change = inertial_2_sat_dcm.T @ self.velocity_change.copy()
+            sat_2_inertial_dcm = np.stack((radial_uvec.T, transverse_uvec.T, normal_uvec.T), axis=1)
+            print(sat_2_inertial_dcm)
+            velocity_change = sat_2_inertial_dcm @ self.velocity_change.copy()
         else:
             velocity_change = self.velocity_change
 

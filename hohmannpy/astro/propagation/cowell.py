@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from .. import spacecraft, perturbations
 
 
+# TODO: Document burn logic.
 class CowellPropagator(base.Propagator):
     r"""
     Simplest non-Keplerian propagate which numerically integrates the equations of motion of a satellite using a
@@ -53,31 +54,70 @@ class CowellPropagator(base.Propagator):
 
         # Get initial values used for propagation and set up logging capabilities.
         for name, satellite in self.satellites.items():
+            # Setup the loggers.
+            if satellite.burns is not None:
+                burns = len(satellite.burns)
+            else:
+                burns = 0
+
             for logger in satellite.loggers:
-                logger.setup(initial_orbit=satellite.orbit, timesteps=self.timesteps)
+                logger.setup(initial_orbit=satellite.orbit, timesteps=self.timesteps, burns=burns)
 
         # Begin the actual propagation loop. This is made of two loops: timesteps (outer), satellites (inner).
-        # For each satellite, first retrieve the orbit. Then use Runge-Kutta 4-th order integration to compute the
-        # position and velocity at the next timestep.
         for timestep in range(1, self.timesteps + 1):
             for name, satellite in self.satellites.items():
-                orbit = satellite.orbit
-                state = self.rk4(
-                    t0=orbit.time,
-                    y0=np.concatenate((orbit.position, orbit.velocity)),
-                    satellite=satellite,
-                )
-                orbit.time += self.step_size  # Advance time.
-                orbit.position = np.array(state[:3])
-                orbit.velocity = np.array(state[3:])
+                old_std_time = satellite.orbit.time
+                if satellite.burns is not None:
+                    next_std_time = old_std_time + self.step_size
 
-                # Use the new position and velocity to update all the orbital elements.
-                orbit.update_classical()
-                if orbit.track_equinoctial:
-                    orbit.update_equinoctial()
+                    while True:
+                        if satellite.burn_index < len(satellite.burns):
+                            burn = satellite.burns[satellite.burn_index]
+                        else:
+                            break
 
-                # Save results from this timestep.
-                self.log(satellite, timestep)
+                        if next_std_time >= burn.start_time:
+                            self.step(name, satellite, burn.start_time - satellite.orbit.time)
+
+                            burn.evaluate(satellite)
+
+                            satellite.orbit.update_classical()
+                            if satellite.orbit.track_equinoctial:
+                                satellite.orbit.update_equinoctial()
+
+                            self.log(satellite)
+                        else:
+                            break
+
+                    self.step(name, satellite, next_std_time - satellite.orbit.time)
+
+                else:
+                    self.step(name, satellite, self.step_size)
+
+    def step(self, name, satellite, time_change):
+        """
+        One step in the propagation loop.
+        """
+
+        # Step the state and position forward by one timestep
+        orbit = satellite.orbit
+        state = self.rk4(
+            t0=orbit.time,
+            delt=time_change,
+            y0=np.concatenate((orbit.position, orbit.velocity)),
+            satellite=satellite,
+        )
+        orbit.time += time_change
+        orbit.position = np.array(state[:3])
+        orbit.velocity = np.array(state[3:])
+
+        # Use the new position and velocity to update all the orbital elements.
+        orbit.update_classical()
+        if orbit.track_equinoctial:
+            orbit.update_equinoctial()
+
+        # Save results from this timestep.
+        self.log(satellite)
 
     def eom(
             self,
@@ -133,6 +173,7 @@ class CowellPropagator(base.Propagator):
     def rk4(
             self,
             t0: float,
+            delt: float,
             y0: np.ndarray,
             satellite: spacecraft.Satellite
     ) -> np.ndarray:
@@ -157,8 +198,8 @@ class CowellPropagator(base.Propagator):
         """
 
         x1 = self.eom(t0, y0, satellite)
-        x2 = self.eom(t0 + self.step_size / 2, y0 + self.step_size / 2 * x1, satellite)
-        x3 = self.eom(t0 + self.step_size / 2, y0 + self.step_size / 2 * x2, satellite)
-        x4 = self.eom(t0 + self.step_size, y0 + self.step_size * x3, satellite)
+        x2 = self.eom(t0 + delt / 2, y0 + delt / 2 * x1, satellite)
+        x3 = self.eom(t0 + delt / 2, y0 + delt / 2 * x2, satellite)
+        x4 = self.eom(t0 + delt, y0 + delt * x3, satellite)
 
-        return y0 + self.step_size / 6 * (x1 + 2 * x2 + 2 * x3 + x4)
+        return y0 + delt / 6 * (x1 + 2 * x2 + 2 * x3 + x4)

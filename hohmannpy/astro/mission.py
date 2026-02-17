@@ -263,7 +263,7 @@ class Mission:
 
             data_df = pd.DataFrame(data, columns=labels)
             data_df.to_csv(
-                f"{target_directory}\\{name}.csv",
+                f"{target_directory}/{name}.csv",
                 index=False,
                 float_format=f"%.{fp_accuracy}f"
             )
