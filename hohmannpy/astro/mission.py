@@ -101,27 +101,25 @@ class Mission:
             # determined by Time objects, we now convert those to relative seconds since mission start. This couldn't be
             # done sooner because when the Burn objects were created the start time of the mission may not have been
             # known.
-            if satellite.burns is not None:
-                for burn in satellite.burns:
-                    if isinstance(burn, maneuvers.ImpulsiveBurn):  # Impulsive case.
-                        if isinstance(burn.start_time, time.Time):
-                            burn.start_time = (burn.start_time.julian_date - initial_global_time.julian_date) * 86400
+            for burn in satellite.impulsive_burns:
+                if isinstance(burn.start_time, time.Time):
+                    burn.start_time = (burn.start_time.julian_date - initial_global_time.julian_date) * 86400
 
-                            # Safeguard to make sure burn happens after mission start.
-                            if burn.start_time < 0:
-                                raise ValueError("Burns may only be scheduled for after the start of the mission.")
+                # Safeguard to make sure burn happens after mission start.
+                if burn.start_time < 0:
+                    raise ValueError("Burns may only be scheduled for after the start of the mission.")
 
-                    elif isinstance(burn, maneuvers.ContinuousBurn):  # Continuous case.
-                        if isinstance(burn.start_time, time.Time):
-                            burn.start_time = (burn.start_time.julian_date - initial_global_time.julian_date) * 86400
-                        if isinstance(burn.end_time,  time.Time):
-                            burn.end_time = (burn.end_time.julian_date - initial_global_time.julian_date) * 86400
+            for burn in satellite.continuous_burns:
+                if isinstance(burn.start_time, time.Time):
+                    burn.start_time = (burn.start_time.julian_date - initial_global_time.julian_date) * 86400
+                if isinstance(burn.end_time,  time.Time):
+                    burn.end_time = (burn.end_time.julian_date - initial_global_time.julian_date) * 86400
 
-                        # Safeguard to ensure Keplerian propagators are not used with continuous burns.
-                        if (isinstance(self.propagator, propagation.KeplerPropagator) or
-                            isinstance(self.propagator, propagation.UniversalVariablePropagator)):
-                            raise TypeError(f"Propagators of type {self.propagator} are not supported for continuous"
-                                            f" burns.")
+                # Safeguard to ensure Keplerian propagators are not used with continuous burns.
+                if (isinstance(self.propagator, propagation.KeplerPropagator) or
+                    isinstance(self.propagator, propagation.UniversalVariablePropagator)):
+                    raise TypeError(f"Propagators of type {self.propagator} are not supported for continuous"
+                                    f" burns.")
 
                 # Order burns to be from least to greatest according to their start_time attribute.
                 satellite.burns.sort(key=lambda x: x.start_time)

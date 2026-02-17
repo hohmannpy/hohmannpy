@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from . import base
+from .. import maneuvers
 
 if TYPE_CHECKING:
     from .. import spacecraft, perturbations
@@ -55,10 +56,7 @@ class CowellPropagator(base.Propagator):
         # Get initial values used for propagation and set up logging capabilities.
         for name, satellite in self.satellites.items():
             # Setup the loggers.
-            if satellite.burns is not None:
-                burns = len(satellite.burns)
-            else:
-                burns = 0
+            burns = len(satellite.impulsive_burns) + len(satellite.continuous_burns)
 
             for logger in satellite.loggers:
                 logger.setup(initial_orbit=satellite.orbit, timesteps=self.timesteps, burns=burns)
@@ -67,12 +65,13 @@ class CowellPropagator(base.Propagator):
         for timestep in range(1, self.timesteps + 1):
             for name, satellite in self.satellites.items():
                 old_std_time = satellite.orbit.time
-                if satellite.burns is not None:
+
+                if len(satellite.impulsive_burns) > 0:
                     next_std_time = old_std_time + self.step_size
 
                     while True:
-                        if satellite.burn_index < len(satellite.burns):
-                            burn = satellite.burns[satellite.burn_index]
+                        if satellite.impulsive_burn_index < len(satellite.impulsive_burns):
+                            burn = satellite.impulsive_burns[satellite.impulsive_burn_index]
                         else:
                             break
 
@@ -164,6 +163,13 @@ class CowellPropagator(base.Propagator):
         if self.perturbing_forces is not None:
             for perturbing_force in self.perturbing_forces:
                 y3_perturb, y4_perturb, y5_perturb = perturbing_force.evaluate(t, y, satellite)
+                y3_dot += y3_perturb
+                y4_dot += y4_perturb
+                y5_dot += y5_perturb
+
+        for burn in satellite.continuous_burns:
+            if burn.start_time <= t <= burn.end_time:
+                y3_perturb, y4_perturb, y5_perturb = burn.evaluate(t, y, satellite)
                 y3_dot += y3_perturb
                 y4_dot += y4_perturb
                 y5_dot += y5_perturb

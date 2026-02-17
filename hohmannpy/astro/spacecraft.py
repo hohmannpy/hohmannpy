@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Optional, Union
 import numpy as np
 import scipy as sp
 
-from . import orbit, logging
+from . import orbit, logging, maneuvers
 
 if TYPE_CHECKING:
-    from . import time, maneuvers
+    from . import time
 
 
 # TODO: Update to include burns.
@@ -86,8 +86,16 @@ class Satellite:
         self.name = name
         self.starting_orbit = starting_orbit
         self.color = color
-        self.burns = burns
-        self.burn_index = 0
+
+        self.impulsive_burns = []
+        self.continuous_burns = []
+        if burns is not None:
+            for burn in burns:
+                if isinstance(burn, maneuvers.ImpulsiveBurn):
+                    self.impulsive_burns.append(burn)
+                else:
+                    self.continuous_burns.append(burn)
+            self.impulsive_burn_index = 0
 
         # Perturbation-specific parameters.
         self.mass = mass

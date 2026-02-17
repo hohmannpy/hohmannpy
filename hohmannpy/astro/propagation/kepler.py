@@ -100,10 +100,7 @@ class KeplerPropagator(base.Propagator):
             satellite.orbit.eccentric_anomaly = self.initial_eccentric_anomalies[name]
 
             # Setup the loggers.
-            if satellite.burns is not None:
-                burns = len(satellite.burns)
-            else:
-                burns = 0
+            burns = len(satellite.impulsive_burns)
 
             for logger in satellite.loggers:
                 logger.setup(initial_orbit=satellite.orbit, timesteps=self.timesteps, burns=burns)
@@ -112,12 +109,12 @@ class KeplerPropagator(base.Propagator):
         # For each satellite,
         for timestep in range(self.timesteps):
             for name, satellite in self.satellites.items():
-                if satellite.burns is not None:
+                if len(satellite.impulsive_burns) > 0:
                     next_std_time = satellite.orbit.time + self.step_size
 
                     while True:
-                        if satellite.burn_index < len(satellite.burns):
-                            burn = satellite.burns[satellite.burn_index]
+                        if satellite.impulsive_burn_index < len(satellite.impulsive_burns):
+                            burn = satellite.impulsive_burns[satellite.impulsive_burn_index]
                         else:
                             break
 
