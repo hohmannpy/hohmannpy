@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from . import base
-from .. import maneuvers
 
 if TYPE_CHECKING:
     from .. import spacecraft, perturbations
