@@ -95,7 +95,11 @@ class Satellite:
                     self.impulsive_burns.append(burn)
                 else:
                     self.continuous_burns.append(burn)
+                    self.inverted_continuous_burns = self.continuous_burns.copy()
+
             self.impulsive_burn_index = 0
+            self.continuous_burn_start_index = 0
+            self.continuous_burn_end_index = 0
 
         # Perturbation-specific parameters.
         self.mass = mass

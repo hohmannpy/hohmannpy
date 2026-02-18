@@ -64,27 +64,48 @@ class CowellPropagator(base.Propagator):
         # Begin the actual propagation loop. This is made of two loops: timesteps (outer), satellites (inner).
         for timestep in range(1, self.timesteps + 1):
             for name, satellite in self.satellites.items():
-                old_std_time = satellite.orbit.time
-
-                if len(satellite.impulsive_burns) > 0:
-                    next_std_time = old_std_time + self.step_size
+                if len(satellite.impulsive_burns) or len(satellite.continuous_burns) > 0:
+                    next_std_time = satellite.orbit.time + self.step_size
 
                     while True:
                         if satellite.impulsive_burn_index < len(satellite.impulsive_burns):
-                            burn = satellite.impulsive_burns[satellite.impulsive_burn_index]
+                            impulsive_burn = satellite.impulsive_burns[satellite.impulsive_burn_index]
+                            next_impulsive_time = impulsive_burn.start_time
                         else:
+                            next_impulsive_time = None
+
+                        if satellite.continuous_burn_start_index < len(satellite.continuous_burns):
+                            continuous_burn = satellite.continuous_burns[satellite.continuous_burn_start_index]
+                            next_continuous_start_time = continuous_burn.start_time
+                        else:
+                            next_continuous_start_time = None
+
+                        if satellite.continuous_burn_end_index < len(satellite.continuous_burns):
+                            continuous_burn = satellite.inverted_continuous_burns[satellite.continuous_burn_end_index]
+                            next_continuous_end_time = continuous_burn.start_time
+                        else:
+                            next_continuous_end_time = None
+
+                        candidate_events = [
+                            ("impulsive", next_impulsive_time),
+                            ("continuous_start", next_continuous_start_time),
+                            ("continuous_end", next_continuous_end_time),
+                        ]
+                        valid_events = [(name, time) for name, time in candidate_events if time is not None]
+                        if not valid_events:
                             break
+                        event_type, next_event_time = min(valid_events, key=lambda x: x[1])
 
-                        if next_std_time >= burn.start_time:
-                            self.step(name, satellite, burn.start_time - satellite.orbit.time)
-
-                            burn.evaluate(satellite)
-
-                            satellite.orbit.update_classical()
-                            if satellite.orbit.track_equinoctial:
-                                satellite.orbit.update_equinoctial()
-
-                            self.log(satellite)
+                        if next_std_time >= next_event_time:
+                            if event_type == "impulsive":
+                                self.step(name, satellite, next_event_time - satellite.orbit.time)
+                                impulsive_burn.evaluate()
+                            elif event_type == "continuous_start":
+                                self.step(name, satellite, next_event_time - satellite.orbit.time)
+                                satellite.continuous_burn_start_index +=1
+                            elif event_type == "continuous_end":
+                                self.step(name, satellite, next_event_time - satellite.orbit.time)
+                                satellite.continuous_burn_end_index += 1
                         else:
                             break
 

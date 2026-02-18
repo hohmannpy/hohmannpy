@@ -109,20 +109,33 @@ class Mission:
                 if burn.start_time < 0:
                     raise ValueError("Burns may only be scheduled for after the start of the mission.")
 
+            satellite.impulsive_burns.sort(key=lambda x: x.start_time)  # Sort from earliest to latest.
+
             for burn in satellite.continuous_burns:
                 if isinstance(burn.start_time, time.Time):
                     burn.start_time = (burn.start_time.julian_date - initial_global_time.julian_date) * 86400
                 if isinstance(burn.end_time,  time.Time):
                     burn.end_time = (burn.end_time.julian_date - initial_global_time.julian_date) * 86400
 
+                # Safeguard to make sure burn happens after mission start.
+                if burn.start_time < 0:
+                    raise ValueError("Burns may only be scheduled for after the start of the mission.")
+
                 # Safeguard to ensure Keplerian propagators are not used with continuous burns.
                 if (isinstance(self.propagator, propagation.KeplerPropagator) or
                     isinstance(self.propagator, propagation.UniversalVariablePropagator)):
-                    raise TypeError(f"Propagators of type {self.propagator} are not supported for continuous"
-                                    f" burns.")
+                    raise TypeError(f"Propagators of type {self.propagator} are not supported for maneuvers of type "
+                                    f"ContinuousBurn.")
 
-                # Order burns to be from least to greatest according to their start_time attribute.
-                satellite.burns.sort(key=lambda x: x.start_time)
+                # Safeguard to make sure all satellites have mass attributes.
+                if satellite.mass is None:
+                    raise AttributeError("If a ContinuousBurn is scheduled this satellites must have a value for the "
+                                         "attribute 'mass'.")
+
+
+            satellite.impulsive_burns.sort(key=lambda x: x.start_time)  # Sort from earliest to latest.
+            satellite.continuous_burns.sort(key=lambda x: x.start_time)
+            satellite.inverted_continuous_burns.sort(key=lambda x: x.end_time)
 
             # There are a bunch of optional parameters for each satellite only needed for specific perturbations. We
             # want to make sure that if a perturbation is enabled that the user has input value for all the needed
