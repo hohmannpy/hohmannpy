@@ -4,7 +4,7 @@ Astrodynamics utilities for designing and propagating orbits.
 
 # Propagators.
 from .propagation import (
-    Propagator, KeplerPropagator, UniversalVariablePropagator, CowellPropagator
+    Propagator, KeplerPropagator, UniversalVariablePropagator, CowellPropagator, EnckePropagator
 )
 
 # Conversions.

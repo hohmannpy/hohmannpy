@@ -3,7 +3,8 @@ from __future__ import annotations
 import numpy as np
 import scipy as sp
 
-from . import propagation, conversions
+from .propagation import universal_variable as uv_propagation  # Weird name to avoid circular import.
+from . import conversions
 
 
 class Orbit:
@@ -534,7 +535,7 @@ class Orbit:
         # Stumpff parameter evaluates the Stumpff series. We need this function so we're going to perform a
         # pseudo-instantiation of this class to get access to it, only passing in attributes relevant to calling
         # stumpff_funcs().
-        uv_propagator = propagation.universal_variable.UniversalVariablePropagator(
+        uv_propagator = uv_propagation.UniversalVariablePropagator(
             stumpff_tol=stumpff_tol,
             stumpff_series_length=stumpff_series_length,
         )

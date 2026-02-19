@@ -63,7 +63,7 @@ class CowellPropagator(base.Propagator):
         # Begin the actual propagation loop. This is made of two loops: timesteps (outer), satellites (inner).
         for timestep in range(1, self.timesteps + 1):
             for name, satellite in self.satellites.items():
-                if len(satellite.impulsive_burns) or len(satellite.continuous_burns) > 0:
+                if satellite.impulsive_burns or satellite.continuous_burns:
                     next_std_time = satellite.orbit.time + self.step_size
 
                     while True:
@@ -98,10 +98,14 @@ class CowellPropagator(base.Propagator):
                         if next_std_time >= next_event_time:
                             if event_type == "impulsive":
                                 self.step(name, satellite, next_event_time - satellite.orbit.time)
-                                impulsive_burn.evaluate()
+                                impulsive_burn.evaluate(satellite)
+                                satellite.orbit.update_classical()
+                                if satellite.orbit.track_equinoctial:
+                                    satellite.orbit.update_equinoctial()
+                                self.log(satellite)
                             elif event_type == "continuous_start":
                                 self.step(name, satellite, next_event_time - satellite.orbit.time)
-                                satellite.continuous_burn_start_index +=1
+                                satellite.continuous_burn_start_index += 1
                             elif event_type == "continuous_end":
                                 self.step(name, satellite, next_event_time - satellite.orbit.time)
                                 satellite.continuous_burn_end_index += 1

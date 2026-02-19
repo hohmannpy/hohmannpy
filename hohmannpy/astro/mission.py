@@ -122,8 +122,10 @@ class Mission:
                     raise ValueError("Burns may only be scheduled for after the start of the mission.")
 
                 # Safeguard to ensure Keplerian propagators are not used with continuous burns.
-                if (isinstance(self.propagator, propagation.KeplerPropagator) or
-                    isinstance(self.propagator, propagation.UniversalVariablePropagator)):
+                if ((isinstance(self.propagator, propagation.KeplerPropagator) or
+                    isinstance(self.propagator, propagation.UniversalVariablePropagator))
+                    and not isinstance(self.propagator, propagation.EnckePropagator)
+                ):
                     raise TypeError(f"Propagators of type {self.propagator} are not supported for maneuvers of type "
                                     f"ContinuousBurn.")
 

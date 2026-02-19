@@ -89,6 +89,7 @@ class Satellite:
 
         self.impulsive_burns = []
         self.continuous_burns = []
+        self.inverted_continuous_burns = []
         if burns is not None:
             for burn in burns:
                 if isinstance(burn, maneuvers.ImpulsiveBurn):
