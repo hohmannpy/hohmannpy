@@ -48,7 +48,7 @@ class SolarRadiation(base.Perturbation):
 
     5) As a consequence of 4, the perturbing acceleration is said to act along a line from the Sun to the satellite.
 
-    6) The Earth's shadow is assumed to be a cylinder of equivalent radius to the Earth along the Earth-Sun line on the shadowed face of the Earth. Solar radiation is fully disabled whenever the satellite lies in this cylinder and otherwise is assumed to act at full strength.
+    6) The Earth's shadow (if enabled) is assumed to be a cylinder of equivalent radius to the Earth along the Earth-Sun line on the shadowed face of the Earth. Solar radiation is fully disabled whenever the satellite lies in this cylinder and otherwise is assumed to act at full strength.
 
     .. [1] James R. Wertz, Spacecraft Attitude Determination and Control, Astrophysics and Space Science Library, vol.
         73. Dordrecht, The Netherlands: Springer, 1978
