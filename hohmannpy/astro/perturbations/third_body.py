@@ -6,7 +6,7 @@ import numpy as np
 import scipy as sp
 
 from ...dynamics import dcms
-from .. import propagation, time, spacecraft, logging
+from .. import propagation, time, spacecraft, logging, orbit
 from . import base
 
 
@@ -17,13 +17,6 @@ class ThirdBodyGravity(base.Perturbation):
 
     Parameters
     ----------
-    initial_global_time: :class:`~hohmannpy.astro.Time`
-        Gregorian date and UT1 time at which propagation of the third (and optionally central) body orbits should begin.
-        Should match the initial and final time passed to the :class:`~hohmannpy.astro.Mission` which holds this
-        perturbation.
-    final_global_time: :class:`~hohmannpy.astro.Time`
-        Gregorian date and UT1 time at which propagation of the third (and optionally central) body orbits should end.
-        Should match the initial and final time passed to the ``Mission`` which holds this perturbation.
     third_body_grav_param : float
         Gravitational parameter of the third body.
     third_body: :class:`~hohmannpy.astro.Satellite`
@@ -58,6 +51,10 @@ class ThirdBodyGravity(base.Perturbation):
         their potential similarities.
     legendre_series_length: int
         If a Legendre polynomial expansion is used, how many terms to include.
+    third_body: :class:`~hohmannpy.astro.Satellite`
+        The object which holds the orbit of the third body.
+    central_body: :class:`~hohmannpy.astro.Satellite`
+        The object which holds the orbit of the central body.
     tb_orbit_spline : :class:`scipy.BSpline`
         Cubic spline of the third body's trajectory. Calling it via ``tb_orbit_spline(time)`` returns the interpolated
         orbit at that time.
@@ -74,8 +71,6 @@ class ThirdBodyGravity(base.Perturbation):
 
     def __init__(
             self,
-            initial_global_time: time.Time,
-            final_global_time:  time.Time,
             third_body_grav_param: float,
             third_body: spacecraft.Satellite,
             central_body: spacecraft.Satellite = None,
@@ -89,39 +84,62 @@ class ThirdBodyGravity(base.Perturbation):
         self.legendre = legendre
         self.legendre_series_length = legendre_series_length
         self.dcm = dcm
+        self.third_body = third_body
+        self.central_body = central_body
 
         # If no DCM is passed set it to a 3x3 identity matrix.
         if self.dcm is None:
             self.dcm = np.array(([1, 0, 0], [0, 1, 0], [0, 0, 1]))
 
+        # Setup finished in finalize__init__() which is called by the Mission.
+        self.tb_orbit_spline = None
+        self.cb_orbit_spline = None
+
+    def finalize__init__(self, initial_global_time: time.Time, final_global_time: time.Time):
+        """
+        Create a ``np.BSpline`` for the third and central body's orbits.
+
+        Both of these attributes are needed by :meth:`evaluate()` but can't be computed in the base ``__init__()``. This
+        is called during :class:`~hohmannpy.astro.Mission`'s instantiation.
+
+        Parameters
+        ----------
+        initial_global_time: time.Time
+            Gregorian date and UT1 time at which simulation begins. Used to compute the time (in days) since the Earth's
+            last aphelion passage for the solar irradiance model.
+        final_global_time: time.Time
+            Gregorian date and UT1 time at which simulation ends.
+        """
+
         # Propagate the orbit's of the third and central bodies and then convert them into cubic splines. If the
         # central body's orbit is not to be propagated instead set it to a function which always returns [0, 0, 0] when
         # passed any time value.
-        propagator = propagation.UniversalVariablePropagator()
-        third_body.loggers = [logging.StateLogger()]
+        propagator = propagation.KeplerPropagator()
+        self.third_body.loggers = [logging.StateLogger()]
 
-        if central_body is None:
+        if self.central_body is None:
             propagator.propagate(
-                satellites={third_body.name: third_body},
-                runtime = (final_global_time.julian_date - initial_global_time.julian_date) * 86400,
+                satellites={self.third_body.name: self.third_body},
+                runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,
             )
 
             def dummy_spline(x):
                 return np.array([0, 0, 0])
+
             self.cb_orbit_spline = dummy_spline
         else:
-            central_body.loggers = [logging.StateLogger()]
+            self.central_body.loggers = [logging.StateLogger()]
             propagator.propagate(
-                satellites={third_body.name: third_body, central_body.name: central_body},
+                satellites={self.third_body.name: self.third_body, self.central_body.name: self.central_body},
                 runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,
             )
 
             self.cb_orbit_spline = sp.interpolate.make_interp_spline(
-                central_body.time_history.squeeze(), central_body.position_history.T, k=3
+                self.central_body.time_history.squeeze(), self.central_body.position_history.T, k=3
             )
 
         self.tb_orbit_spline = sp.interpolate.make_interp_spline(
-            third_body.time_history.squeeze(), third_body.position_history.T, k=3
+            self.third_body.time_history.squeeze(), self.third_body.position_history.T, k=3
         )
 
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
@@ -190,12 +208,6 @@ class LunarGravity(ThirdBodyGravity):
 
     Parameters
     ----------
-    initial_global_time: :class:`~hohmannpy.astro.Time`
-        Gregorian date and UT1 time at which propagation of the Moon's orbit should begin. Should match the initial and
-        final time passed to the :class:`~hohmannpy.astro.Mission` which holds this perturbation.
-    final_global_time: :class:`~hohmannpy.astro.Time`
-        Gregorian date and UT1 time at which propagation of the Moon's orbit should end. Should match the initial and
-        final time passed to the ``~hohmannpy.astro.Mission`` which holds this perturbation.
     legendre: bool
         Whether to use a Legendre polynomial expansion in the computation of the Moon's perturbing effects. Used to
         avoid small difference numerical accuracy losses from the difference between the two position cubics due to
@@ -216,8 +228,6 @@ class LunarGravity(ThirdBodyGravity):
 
     def __init__(
             self,
-            initial_global_time: time.Time,
-            final_global_time: time.Time,
             initial_true_anomaly: float,
             legendre: bool = True,
             legendre_series_length: int = 10,
@@ -226,8 +236,6 @@ class LunarGravity(ThirdBodyGravity):
         moon = spacecraft.Moon(initial_true_anomaly)
 
         super().__init__(
-            initial_global_time=initial_global_time,
-            final_global_time=final_global_time,
             third_body_grav_param=4.9048695e12,
             third_body=moon,
             legendre=legendre,
@@ -245,12 +253,6 @@ class SolarGravity(ThirdBodyGravity):
 
     Parameters
     ----------
-    initial_global_time: :class:`~hohmannpy.astro.Time`
-        Gregorian date and UT1 time at which propagation of Earth's orbit should begin. Should match the initial and
-        final time passed to the :class:`~hohmannpy.astro.Mission` which holds this perturbation.
-    final_global_time: :class:`~hohmannpy.astro.Time`
-        Gregorian date and UT1 time at which propagation of the Earth's orbit should end. Should match the initial and
-        final time passed to the ``Mission`` which holds this perturbation.
     legendre: bool
         Whether to use a Legendre polynomial expansion in the computation of the Earth's perturbing effects. Used to
         avoid small difference numerical accuracy losses from the difference between the two position cubics due to
@@ -273,29 +275,59 @@ class SolarGravity(ThirdBodyGravity):
 
     def __init__(
             self,
-            initial_global_time: time.Time,
-            final_global_time: time.Time,
             legendre: bool = True,
             legendre_series_length: int = 10,
     ):
-        # Initialize the Earth.
-        earth = spacecraft.Earth(initial_global_time)
         earth_tilt = np.deg2rad(-23.439291115)  # Rotate from Sun-fixed to Earth-fixed frame via the Earth's axial tilt.
 
+        # Our actually third body is the Earth but to instantiate it we need the initial global time (so we can locate
+        # the Earth on its orbit). That isn't passed in till finalize__init__() is called so create a temporary dummy
+        # third body. We'll replace it with the Earth in the aforementioned function.
+        dummy_third_body = spacecraft.Satellite(
+            starting_orbit=orbit.Orbit(
+                position=np.array([1, 1, 1]),
+                velocity=np.array([0, 0, 1]),
+            ),
+            name="temp"
+        )
         super().__init__(
-            initial_global_time=initial_global_time,
-            final_global_time=final_global_time,
             third_body_grav_param=1.32712440018e20,
-            third_body=earth,
+            third_body=dummy_third_body,
             legendre=legendre,
             legendre_series_length=legendre_series_length,
             dcm=dcms.euler_2_dcm(earth_tilt, 1)
         )
 
+
+    def finalize__init__(self, initial_global_time: time.Time, final_global_time: time.Time):
+        """
+        Extension of :class:`~hohmannpy.astro.ThirdBodyGravity` .
+        :meth:`~hohmannpy.astro.ThirdBodyGravity.finalize__init__()` that creates an Earth object and then calculates
+        its orbit around the Sun. This can be inverted to get the Sun's "orbit" about the Earth.
+
+        Parameters
+        ----------
+        initial_global_time: time.Time
+            Gregorian date and UT1 time at which simulation begins. Used to compute the time (in days) since the Earth's
+            last aphelion passage for the solar irradiance model.
+        final_global_time: time.Time
+            Gregorian date and UT1 time at which simulation ends.
+        """
+
+        # Initialize the Earth.
+        earth = spacecraft.Earth(initial_global_time)
+        self.third_body = earth
+
+        # Call parent class' finalize__init__() to create the needed orbit splines.
+        super().finalize__init__(initial_global_time=initial_global_time, final_global_time=final_global_time)
+
         # Currently we have a spline which returns the Earth as the third body orbiting about the Sun. We want the Sun
         # to be the third body so we wrap the orbit_spline of the Earth so that it always returns the position of the
         # Sun wrt. the Earth instead.
         tb_orbit_spline = copy.deepcopy(self.tb_orbit_spline)
+
         def inverted_spline(x):
             return -tb_orbit_spline(x)
+
         self.tb_orbit_spline = inverted_spline
+

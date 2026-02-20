@@ -23,8 +23,6 @@ class NonSphericalEarth(base.Perturbation):
     ----------
     degree : int
         Maximum degree of harmonics to include.
-    initial_gmst : float
-        Initial angle of the Greenwich meridian in :math:`rad`.
     zonal : bool
         Disable sectoral and tesseral harmonics to only look at zonal ones (such as J2). Does this by capping the
         maximum order summed to when computing the acceleration terms to 0.
@@ -54,12 +52,12 @@ class NonSphericalEarth(base.Perturbation):
     3) The GMST of the Earth is initially accurately computed wrt. the Vernal equinox (ignoring nutation) and is then said to linearly rotate at the Earth's mean rotation rate without precession.
     """
 
-    def __init__(self, degree: int, initial_gmst: float, zonal: bool = False):
+    def __init__(self, degree: int, zonal: bool = False):
         super().__init__()
 
         self.degree = degree
         self.zonal = zonal
-        self.initial_gmst = initial_gmst
+        self.initial_gmst = None
 
         # Import the harmonic coefficients.
         with importlib.resources.files("hohmannpy.resources").joinpath("egm84_c_coeffs.csv").open() as f:
@@ -67,6 +65,24 @@ class NonSphericalEarth(base.Perturbation):
 
         with importlib.resources.files("hohmannpy.resources").joinpath("egm84_s_coeffs.csv").open() as f:
             self.s_coeffs = np.loadtxt(f, delimiter=",")  # n rows, m columns, from [0, 180]
+
+        # Setup finished in finalize__init__() which is called by the Mission.
+        self.initial_gmst = None
+
+    def finalize__init__(self, initial_gmst: float):
+        """
+        Record the initial GMST of the Earth which is used to correctly orient it for geopotential modeling.
+
+        This is needed by :meth:`evaluate()` but can't be passed to the base ``__init__()``. This is called during
+        :class:`~hohmannpy.astro.Mission`'s instantiation.
+
+        Parameters
+        ----------
+        initial_gmst : float
+            Initial angle of the Greenwich meridian in :math:`rad`.
+        """
+
+        self.initial_gmst = initial_gmst
 
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""

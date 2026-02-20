@@ -157,6 +157,18 @@ class Mission:
                         raise AttributeError("If SolarRadiation is enabled as a perturbation all satellites must have"
                                              "a value for the attribute 'reflectivity'.")
 
+        # Perform some QOL assignment of Perturbation object attributes based on the initial and final global times so
+        # the user doesn't have to redundantly pass these to both the Mission and these object's __init__()s.
+        if self.perturbing_forces is not None:
+            for perturbation in self.perturbing_forces:
+                if isinstance(perturbation, perturbations.SolarRadiation):
+                    perturbation.finalize__init__(self.initial_global_time, self.final_global_time)
+                if isinstance(perturbation, perturbations.NonSphericalEarth):
+                    perturbation.finalize__init__(self.initial_global_time.gmst)
+                if isinstance(perturbation, perturbations.ThirdBodyGravity):
+                    perturbation.finalize__init__(self.initial_global_time, self.final_global_time)
+
+
     def simulate(self):
         r"""
         Propagate the orbits of all stored ``Satellite``.

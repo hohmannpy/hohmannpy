@@ -247,6 +247,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
                     + del_y[2] * (y_ref[2] + 0.5 * del_y[2])
         )
 
+        # TODO: Validate this Taylor series by hand.
         if abs(encke_param) < self.encke_tol:
             encke_func = 0
             for i in range(self.encke_series_length):
