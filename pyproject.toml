@@ -18,6 +18,7 @@ dependencies = [
     "pylinalg",
     "rendercanvas",
     "pygfx",
+    "glfw"
 ]
 
 [tool.setuptools.packages.find]

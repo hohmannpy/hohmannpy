@@ -40,6 +40,11 @@ class KeplerPropagator(base.Propagator):
     perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
         Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are added
         a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
+    initial_times : dict[str, float]
+
+    initial_positions : dict[str, np.ndarray]
+    initial_velocities : dict[str, np.ndarray]
+    initial_eccentric_anomalies : dict[str, float]
     """
 
     def __init__(

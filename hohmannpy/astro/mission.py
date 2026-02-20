@@ -134,7 +134,6 @@ class Mission:
                     raise AttributeError("If a ContinuousBurn is scheduled this satellites must have a value for the "
                                          "attribute 'mass'.")
 
-
             satellite.impulsive_burns.sort(key=lambda x: x.start_time)  # Sort from earliest to latest.
             satellite.continuous_burns.sort(key=lambda x: x.start_time)
             satellite.inverted_continuous_burns.sort(key=lambda x: x.end_time)
