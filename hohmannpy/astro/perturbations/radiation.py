@@ -17,6 +17,8 @@ class SolarRadiation(base.Perturbation):
     irradiance_scale_factor : float
         Constant to scale the solar irradiance by at all timesteps. Useful for representing heightened solar activity
         such as during solar flares.
+    shadowing: bool
+        Flag which determines whether the Earth's shadow should be modeled.
 
     Attributes
     ----------
@@ -29,6 +31,8 @@ class SolarRadiation(base.Perturbation):
     initial_jd_since_aphelion : float
         Number of Julian days passed since aphelion, taken to be on the most recent July 4th before
         ``initial_global_time``.
+    shadowing: bool
+        Flag which determines whether the Earth's shadow should be modeled.
 
     Notes
     -----
@@ -53,10 +57,12 @@ class SolarRadiation(base.Perturbation):
     def __init__(
             self,
             irradiance_scale_factor: float = 1,
+            shadowing: bool = True
     ):
         super().__init__()
 
         self.irradiance_scale_factor = irradiance_scale_factor
+        self.shadowing = shadowing
 
         # Setup finished in finalize__init__() which is called by the Mission.
         self.earth_orbit_spline = None
@@ -150,15 +156,16 @@ class SolarRadiation(base.Perturbation):
         # satellite lies in the Earth's shade cylinder. This can be done by finding the component of the satellite's
         # position perpendicular to the Earth-Sun line and checking to see if it's magnitude is less than the radius of
         # the cylinder (which is equivalent to Earth's radius).
-        position_sun_wrt_earth = -position_earth_wrt_sun
-        sun_angle_check = (
-                np.dot(position_sun_wrt_earth, state[:3])
-                    / (np.linalg.norm(position_sun_wrt_earth) * np.linalg.norm(state[:3]))
-        )
-        if sun_angle_check < 1:
-            shade_uvec = position_earth_wrt_sun / np.linalg.norm(position_earth_wrt_sun)
-            if np.linalg.norm(state[:3] - np.dot(state[:3], shade_uvec) * shade_uvec) < earth_radius:
-                return np.array([0, 0, 0])  # If eclipsed, disable solar radiation.
+        if self.shadowing:
+            position_sun_wrt_earth = -position_earth_wrt_sun
+            sun_angle_check = (
+                    np.dot(position_sun_wrt_earth, state[:3])
+                        / (np.linalg.norm(position_sun_wrt_earth) * np.linalg.norm(state[:3]))
+            )
+            if sun_angle_check < 1:
+                shade_uvec = position_earth_wrt_sun / np.linalg.norm(position_earth_wrt_sun)
+                if np.linalg.norm(state[:3] - np.dot(state[:3], shade_uvec) * shade_uvec) < earth_radius:
+                    return np.array([0, 0, 0])  # If eclipsed, disable solar radiation.
 
         # Compute the acceleration.
         acceleration = (
