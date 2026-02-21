@@ -16,8 +16,9 @@ dependencies = [
     "pandas",
     "imageio",
     "pylinalg",
-    "rendercanvas",w
-    "pygfx"
+    "rendercanvas",
+    "pygfx",
+    "glfw",
 ]
 
 [tool.setuptools.packages.find]
