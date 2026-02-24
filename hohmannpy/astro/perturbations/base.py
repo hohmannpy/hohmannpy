@@ -39,6 +39,11 @@ class Perturbation(ABC):
             satellite can be used in computing perturbing acceleration, such as the ``ballistic_coeff`` by
             :class:`~hohmannpy.astro.AtmosphericDrag`. However, the state of the satellite should never be accessed
             directly, only via the passed ``state`` parameter.
+
+        Returns
+        -------
+        acceleration : np.ndarray
+            Acceleration due to this perturbation.
         """
 
         pass

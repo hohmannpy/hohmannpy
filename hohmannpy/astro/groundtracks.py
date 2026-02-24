@@ -48,7 +48,12 @@ class Groundtrack:
         for i in range(satellite.time_history.size):
             gmst = self.initial_gmst + earth_rot * satellite.time_history[0, i]
 
-            position = satellite.position_history[:, i]
+            try:
+                position = satellite.position_history[:, i]
+            except AttributeError:  # Safeguard to make sure propagation has occurred first.
+                raise AttributeError("The satellite must have its orbit propagated before generating a groundtrack.")
+
+            # Convert position from ECI to ECEF frame.
             position = dcms.euler_2_dcm(gmst, 3) @ position
 
             earth_radius = 6378.1363e3

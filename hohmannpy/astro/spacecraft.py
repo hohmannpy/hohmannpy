@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from . import time
 
 
-# TODO: Update to include burns.
 class Satellite:
     r"""
     Basic spacecraft whose motion can be simulated using :class:`~hohmannpy.astro.Mission`.
@@ -24,6 +23,8 @@ class Satellite:
         The orbit the spacecraft is in at the start of the perturbation.
     color: str
         The color of the orbit and spacecraft to display in renderings.
+    burns : Optional[list[Union[maneuvers.ImpulsiveBurn, maneuvers.ContinuousBurn]]]
+        The set of impulsive and continuous burns to schedule for this spacecraft.
     mass: float
         Mass of the spacecraft in :math:`kg`. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
@@ -65,6 +66,21 @@ class Satellite:
         Dimensionless parameter proportional to how much solar radiation is reflected by the ``mean_reflective_area``.
         0 = transparent, 1 = full absorption, and 2 = full reflection. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
+    impulsive_burns : list[:class:`~hohmannpy.astro.ImpulsiveBurn`]
+        The set of scheduled impulsive burns for this satellite. These will end up sorted from earliest to latest based
+        on their ``start_time`` attribute.
+    continuous_burns : list[:class:`~hohmannpy.astro.ContinuousBurn`]
+        The set of scheduled continuous burns for this satellite. These will end up sorted from earliest to latest based
+        on their ``start_time`` attribute.
+    inverted_continuous_burns : list[:class:`~hohmannpy.astro.ContinuousBurn`]
+        Same as ``continuous_burns``, but this time sorted from earliest to latest based on their ``end_time``
+        attribute.
+    impulsive_burn_index : int
+        Which burn from ``impulsive_burns`` is currently scheduled next.
+    continuous_burn_start_index : int
+        Which burn from ``continuous_burns`` is currently scheduled to start next.
+    continuous_burn_end_index : int
+        Which burn from ``inverted_continuous_burns`` is currently scheduled to end next.
 
     Notes
     -----
@@ -87,9 +103,12 @@ class Satellite:
         self.starting_orbit = starting_orbit
         self.color = color
 
-        self.impulsive_burns = []
-        self.continuous_burns = []
-        self.inverted_continuous_burns = []
+        self.impulsive_burns: list[maneuvers.ImpulsiveBurn] = []
+        self.continuous_burns: list[maneuvers.ContinuousBurn] = []
+        self.inverted_continuous_burns: list[maneuvers.ContinuousBurn] = []
+
+        # Sort the scheduled burns into separate continuous and impulsive burn lists. Don't sort them yet, this is
+        # handled by the Mission class.
         if burns is not None:
             for burn in burns:
                 if isinstance(burn, maneuvers.ImpulsiveBurn):
