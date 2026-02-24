@@ -1,11 +1,11 @@
 from __future__ import annotations
 import copy
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import scipy as sp
 
-from . import orbit, logging
+from . import orbit, logging, maneuvers
 
 if TYPE_CHECKING:
     from . import time
@@ -23,6 +23,8 @@ class Satellite:
         The orbit the spacecraft is in at the start of the perturbation.
     color: str
         The color of the orbit and spacecraft to display in renderings.
+    burns : Optional[list[Union[:class:`~hohmannpy.astro.ImpulsiveBurn`, :class:`~hohmannpy.astro.ContinuousBurn`]]]
+        The set of impulsive and continuous.rst burns to schedule for this spacecraft.
     mass: float
         Mass of the spacecraft in :math:`kg`. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
@@ -64,6 +66,21 @@ class Satellite:
         Dimensionless parameter proportional to how much solar radiation is reflected by the ``mean_reflective_area``.
         0 = transparent, 1 = full absorption, and 2 = full reflection. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
+    impulsive_burns : list[:class:`~hohmannpy.astro.ImpulsiveBurn`]
+        The set of scheduled impulsive burns for this satellite. These will end up sorted from earliest to latest based
+        on their ``start_time`` attribute.
+    continuous_burns : list[:class:`~hohmannpy.astro.ContinuousBurn`]
+        The set of scheduled continuous.rst burns for this satellite. These will end up sorted from earliest to latest based
+        on their ``start_time`` attribute.
+    inverted_continuous_burns : list[:class:`~hohmannpy.astro.ContinuousBurn`]
+        Same as ``continuous_burns``, but this time sorted from earliest to latest based on their ``end_time``
+        attribute.
+    impulsive_burn_index : int
+        Which burn from ``impulsive_burns`` is currently scheduled next.
+    continuous_burn_start_index : int
+        Which burn from ``continuous_burns`` is currently scheduled to start next.
+    continuous_burn_end_index : int
+        Which burn from ``inverted_continuous_burns`` is currently scheduled to end next.
 
     Notes
     -----
@@ -76,32 +93,57 @@ class Satellite:
             name: str,
             starting_orbit: orbit.Orbit,
             color: str = "#FF073A",
-            mass: float = None,
+            burns: Optional[list[Union[maneuvers.ImpulsiveBurn, maneuvers.ContinuousBurn]]] = None,
+            mass: float = None,  # TODO: Make this Any[float, Callable].
             ballistic_coeff: float = None,
             mean_reflective_area: float = None,
-            reflectivity: float = None,
+            reflectivity: float = None
     ):
         self.name = name
         self.starting_orbit = starting_orbit
+        self.color = color
+
+        self.impulsive_burns: list[maneuvers.ImpulsiveBurn] = []
+        self.continuous_burns: list[maneuvers.ContinuousBurn] = []
+        self.inverted_continuous_burns: list[maneuvers.ContinuousBurn] = []
+
+        # Sort the scheduled burns into separate continuous.rst and impulsive burn lists. Don't sort them yet, this is
+        # handled by the Mission class.
+        if burns is not None:
+            for burn in burns:
+                if isinstance(burn, maneuvers.ImpulsiveBurn):
+                    self.impulsive_burns.append(burn)
+                else:
+                    self.continuous_burns.append(burn)
+                    self.inverted_continuous_burns = self.continuous_burns.copy()
+
+            self.impulsive_burn_index = 0
+            self.continuous_burn_start_index = 0
+            self.continuous_burn_end_index = 0
+
+        # Perturbation-specific parameters.
         self.mass = mass
         self.ballistic_coeff = ballistic_coeff
         self.mean_reflective_area = mean_reflective_area
         self.reflectivity = reflectivity
-        self.color = color
 
         self.orbit: orbit.Orbit = copy.deepcopy(starting_orbit)  # This will be updated over time by the propagator.
-        self.loggers: Any[list[logging.Logger], None] = None  # Filled in by the __init__() of Mission.
+        self.loggers: Optional[list[logging.Logger]] = None  # Filled in by the __init__() of Mission.
 
     def __getattr__(self, name):
         r"""
         Access data from ``Loggers`` assigned to this object as if they were assigned to this class.
         """
 
-        if self.loggers is not None:
-            for logger in self.loggers:
+        # Need a safeguard here because can't call self.(some attribute) inside __getattr__() because this can break
+        # during the pickling which occurs during parallel processing.
+        loggers = object.__getattribute__(self, "__dict__").get("loggers", None)
+
+        if loggers is not None:
+            for logger in loggers:
                 if hasattr(logger, name):
                     return getattr(logger, name)
-        raise AttributeError(f"This satellite has not logged data for {self.name}.")
+        raise AttributeError(f"This satellite has not logged data for {name}.")
 
 
 class Moon(Satellite):

@@ -14,14 +14,11 @@ class SolarRadiation(base.Perturbation):
 
     Parameters
     ----------
-    initial_global_time: time.Time
-        Gregorian date and UT1 time at which simulation begins. Used to compute the time (in days) since the Earth's
-        last aphelion passage for the solar irradiance model.
-    final_global_time: time.Time
-        Gregorian date and UT1 time at which simulation ends.
     irradiance_scale_factor : float
         Constant to scale the solar irradiance by at all timesteps. Useful for representing heightened solar activity
         such as during solar flares.
+    shadowing: bool
+        Flag which determines whether the Earth's shadow should be modeled.
 
     Attributes
     ----------
@@ -34,6 +31,8 @@ class SolarRadiation(base.Perturbation):
     initial_jd_since_aphelion : float
         Number of Julian days passed since aphelion, taken to be on the most recent July 4th before
         ``initial_global_time``.
+    shadowing: bool
+        Flag which determines whether the Earth's shadow should be modeled.
 
     Notes
     -----
@@ -49,7 +48,7 @@ class SolarRadiation(base.Perturbation):
 
     5) As a consequence of 4, the perturbing acceleration is said to act along a line from the Sun to the satellite.
 
-    6) Shade due to the Earth is not accounted for which will introduce inaccuracies for LEO orbits.
+    6) The Earth's shadow (if enabled) is assumed to be a cylinder of equivalent radius to the Earth along the Earth-Sun line on the shadowed face of the Earth. Solar radiation is fully disabled whenever the satellite lies in this cylinder and otherwise is assumed to act at full strength.
 
     .. [1] James R. Wertz, Spacecraft Attitude Determination and Control, Astrophysics and Space Science Library, vol.
         73. Dordrecht, The Netherlands: Springer, 1978
@@ -57,26 +56,47 @@ class SolarRadiation(base.Perturbation):
 
     def __init__(
             self,
-            initial_global_time: time.Time,
-            final_global_time: time.Time,
             irradiance_scale_factor: float = 1,
+            shadowing: bool = True
     ):
         super().__init__()
 
         self.irradiance_scale_factor = irradiance_scale_factor
+        self.shadowing = shadowing
+
+        # Setup finished in finalize__init__() which is called by the Mission.
+        self.earth_orbit_spline = None
+        self.initial_jd_since_aphelion = None
+
+    def finalize__init__(self, initial_global_time: time.Time, final_global_time: time.Time):
+        """
+        Create a ``np.BSpline`` for the Earth's orbit and determine the current number of Julian days since the last
+        aphelion passage.
+
+        Both of these attributes are needed by :meth:`evaluate()` but can't be computed in the base ``__init__()``. This
+        is called during :class:`~hohmannpy.astro.Mission`'s instantiation.
+
+        Parameters
+        ----------
+        initial_global_time: time.Time
+            Gregorian date and UT1 time at which simulation begins. Used to compute the time (in days) since the Earth's
+            last aphelion passage for the solar irradiance model.
+        final_global_time: time.Time
+            Gregorian date and UT1 time at which simulation ends.
+        """
 
         # Get a spline corresponding to the Earth's orbit.
         earth = spacecraft.Earth(initial_global_time)
 
-        propagator = propagation.UniversalVariablePropagator()
+        propagator = propagation.KeplerPropagator()
         propagator.propagate(
             satellites={earth.name: earth},
             runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,
         )
 
         self.earth_orbit_spline = sp.interpolate.make_interp_spline(
-                earth.time_history.squeeze(), earth.position_history.T, k=3
-            )
+            earth.time_history.squeeze(), earth.position_history.T, k=3
+        )
 
         # Compute the Julian days since the most recent aphelion. First we determine if we are in a month before or
         # after the current year's aphelion (July 4th, 12:00:00 UT1). If after just compute the Julian days since the
@@ -113,6 +133,7 @@ class SolarRadiation(base.Perturbation):
         """
 
         speed_of_light = 3e8
+        earth_radius = 6378.1363e3
 
         # Compute the position of the Sun wrt. the satellite. This involves first transforming the positon of the Earth
         # wrt. the sun from the heliocentric to ECI frame (this position is accessed from the earth_orbit_spline). Then
@@ -127,6 +148,24 @@ class SolarRadiation(base.Perturbation):
         days_since_aphelion = (self.initial_jd_since_aphelion + time / 86400) % 365.25
         irradiance = 1358 / (1.004 + 0.0334 * np.cos(2 * np.pi * days_since_aphelion)) * self.irradiance_scale_factor
         solar_pressure = irradiance / speed_of_light
+
+        # Perform a check to see if the satellite is in the Earth's shadow. First check if the cosine of the angle
+        # between the Earth-Sun line and the satellite's position vector is less than 0. If so, the satellite is on the
+        # shadowed side of the Earth. However, this alone is not enough because the satellite may be far enough away
+        # from the Earth that it is still not eclipsed. To account for this, perform a second check to determine if the
+        # satellite lies in the Earth's shade cylinder. This can be done by finding the component of the satellite's
+        # position perpendicular to the Earth-Sun line and checking to see if it's magnitude is less than the radius of
+        # the cylinder (which is equivalent to Earth's radius).
+        if self.shadowing:
+            position_sun_wrt_earth = -position_earth_wrt_sun
+            sun_angle_check = (
+                    np.dot(position_sun_wrt_earth, state[:3])
+                        / (np.linalg.norm(position_sun_wrt_earth) * np.linalg.norm(state[:3]))
+            )
+            if sun_angle_check < 1:
+                shade_uvec = position_earth_wrt_sun / np.linalg.norm(position_earth_wrt_sun)
+                if np.linalg.norm(state[:3] - np.dot(state[:3], shade_uvec) * shade_uvec) < earth_radius:
+                    return np.array([0, 0, 0])  # If eclipsed, disable solar radiation.
 
         # Compute the acceleration.
         acceleration = (

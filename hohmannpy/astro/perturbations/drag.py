@@ -22,7 +22,7 @@ class AtmosphericDrag(base.Perturbation):
 
     Parameters
     ----------
-    gmst : float
+    initial_gmst : float
         Current angle of the Greenwich meridian in radians.
     solar_activity : str
         Which CIRA-12 reference atmosphere model to use for the density. Can select between "low", "medium", and "high".
@@ -67,13 +67,13 @@ class AtmosphericDrag(base.Perturbation):
 
     def __init__(
             self,
-            gmst: float,
+            initial_gmst: float,
             solar_activity: str = "moderate",
             solver_tol: float = 1e-8
     ):
         super().__init__()
 
-        self.initial_gmst = gmst
+        self.initial_gmst = initial_gmst
         self.solver_tol = solver_tol
 
         # Import the density table to use based on the chosen solar and geomagnetic activity level.
@@ -106,7 +106,7 @@ class AtmosphericDrag(base.Perturbation):
                              f"'low', 'medium', or 'high'.")
         self.exosphere_bound = density_curve[-1, 0]
 
-    def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.array:
+    def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""
         Computes the perturbing acceleration using a model for the drag caused by the Earth's atmosphere.
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
@@ -27,10 +27,13 @@ class Propagator:
     step_size : float
         Time interval between propagation steps. If one is not provided by the user it will be set in ``propagate()`` to
         60 :math:`s`.
-    satellites : dict[str, :class:`~hohmannpy.astro.Satellite`]
+    timesteps: Optional[int]
+        How many discrete timepoints to propagate at. This is based purely on the :attr:`step_size` and doesn't include
+        additional timesteps injected to account for events like burns.
+    satellites : Optional[dict[str, :class:`~hohmannpy.astro.Satellite`]]
         Dictionary which hold the orbits to propagate as an attribute named ``orbit`` attached to each satellite.
         Satellites are indexed by their name.
-    perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
+    perturbing_forces : Optional[list[:class:`~hohmannpy.astro.Perturbation`]]
         Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are added
         a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
     """
@@ -38,9 +41,9 @@ class Propagator:
     def __init__(self, step_size: float = 60):
         self.step_size = step_size
 
-        self.satellites: Any[dict[str, spacecraft.Satellite], None] = None
-        self.perturbing_forces: Any[list[perturbations.base.Perturbation], None] = None
-        self.timesteps: Any[int, None] = None
+        self.satellites: Optional[dict[str, spacecraft.Satellite]] = None
+        self.perturbing_forces: Optional[list[perturbations.base.Perturbation]] = None
+        self.timesteps: Optional[int] = None
 
     def propagate(
             self,
@@ -72,11 +75,15 @@ class Propagator:
         # Compute number of discrete timesteps to propagate for.
         self.timesteps = int(np.floor(runtime / self.step_size))
 
-    def log(self, timestep):
+    def log(self, satellite: spacecraft.Satellite):
         r"""
-        For every satellite being propagated access their stored :class:`~hohmannpy.astro.Logger`'s and log data.
+        For a satellite being propagated access their stored :class:`~hohmannpy.astro.Logger`'s and log data.
+
+        Parameters
+        ----------
+        satellite : spacecraft.Satellite
+            Spacecraft to log data for.
         """
 
-        for satellite in self.satellites.values():
-            for logger in satellite.loggers:
-                logger.log(current_orbit=satellite.orbit, timestep=timestep)
+        for logger in satellite.loggers:
+            logger.log(current_orbit=satellite.orbit)
