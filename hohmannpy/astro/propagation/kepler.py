@@ -30,20 +30,19 @@ class KeplerPropagator(base.Propagator):
 
     Attributes
     ----------
-    step_size : float
-        Time interval between propagation steps. If one is not provided by the user it will be set in ``propagate()`` to
-        60 :math:`s`.
-    satellites : dict[str, :class:`~hohmannpy.astro.Satellite`]
-        Dictionary which hold the orbits to propagate as an attribute named ``orbit`` attached to each satellite.
-        Satellites are indexed by their name.
-    perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
-        Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are added
-        a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
+    solver_tol: float
+        Error tolerance when performing root-finding to solver Kepler's equation.
+    fg_constraint: bool
+        Flag which indicates whether to compute the derivative of the g function (``False``) or to use a constraint to
+        eliminate it (``True``).
     initial_times : dict[str, float]
-
+        The base point times at which propagation began.
     initial_positions : dict[str, np.ndarray]
+        The base point positions at which propagation began.
     initial_velocities : dict[str, np.ndarray]
+        The base point velocities at which propagation began.
     initial_eccentric_anomalies : dict[str, float]
+        The base point eccentric anomalies at which propagation began.
     """
 
     def __init__(
@@ -180,7 +179,7 @@ class KeplerPropagator(base.Propagator):
                     self.step(name, satellite)
 
     def step(self, name, satellite):
-        """
+        r"""
         One step in the propagation loop.
 
         Parameters

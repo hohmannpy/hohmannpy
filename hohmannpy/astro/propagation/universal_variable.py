@@ -36,6 +36,24 @@ class UniversalVariablePropagator(base.Propagator):
         parameter being under ``stumpff_tol``.
     stumpff_series_length : int
         When the Stumpff series are computed via summation, how many terms to include.
+
+    Attributes
+    ----------
+    solver_tol: float
+        Error tolerance when performing root-finding to solver Kepler's equation.
+    fg_constraint: bool
+        Flag which indicates whether to compute the derivative of the g function (``False``) or to use a constraint to
+        eliminate it (``True``).
+    stumpff_tol: float
+        Tolerance at which to switch to the infinite series definition of the Stumpff series.
+    stumpff_series_length : int
+        When the Stumpff series are computed via summation, how many terms to include.
+    initial_times : dict[str, float]
+        The base point times at which propagation began.
+    initial_positions : dict[str, np.ndarray]
+        The base point positions at which propagation began.
+    initial_velocities : dict[str, np.ndarray]
+        The base point velocities at which propagation began.
     """
 
     def __init__(
@@ -179,7 +197,7 @@ class UniversalVariablePropagator(base.Propagator):
                     self.step(name, satellite)
 
     def step(self, name, satellite):
-        """
+        r"""
         One step in the propagation loop.
 
         Parameters

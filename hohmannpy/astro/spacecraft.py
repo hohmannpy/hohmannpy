@@ -23,8 +23,8 @@ class Satellite:
         The orbit the spacecraft is in at the start of the perturbation.
     color: str
         The color of the orbit and spacecraft to display in renderings.
-    burns : Optional[list[Union[maneuvers.ImpulsiveBurn, maneuvers.ContinuousBurn]]]
-        The set of impulsive and continuous burns to schedule for this spacecraft.
+    burns : Optional[list[Union[:class:`~hohmannpy.astro.ImpulsiveBurn`, :class:`~hohmannpy.astro.ContinuousBurn`]]]
+        The set of impulsive and continuous.rst burns to schedule for this spacecraft.
     mass: float
         Mass of the spacecraft in :math:`kg`. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
@@ -70,7 +70,7 @@ class Satellite:
         The set of scheduled impulsive burns for this satellite. These will end up sorted from earliest to latest based
         on their ``start_time`` attribute.
     continuous_burns : list[:class:`~hohmannpy.astro.ContinuousBurn`]
-        The set of scheduled continuous burns for this satellite. These will end up sorted from earliest to latest based
+        The set of scheduled continuous.rst burns for this satellite. These will end up sorted from earliest to latest based
         on their ``start_time`` attribute.
     inverted_continuous_burns : list[:class:`~hohmannpy.astro.ContinuousBurn`]
         Same as ``continuous_burns``, but this time sorted from earliest to latest based on their ``end_time``
@@ -94,7 +94,7 @@ class Satellite:
             starting_orbit: orbit.Orbit,
             color: str = "#FF073A",
             burns: Optional[list[Union[maneuvers.ImpulsiveBurn, maneuvers.ContinuousBurn]]] = None,
-            mass: float = None,
+            mass: float = None,  # TODO: Make this Any[float, Callable].
             ballistic_coeff: float = None,
             mean_reflective_area: float = None,
             reflectivity: float = None
@@ -107,7 +107,7 @@ class Satellite:
         self.continuous_burns: list[maneuvers.ContinuousBurn] = []
         self.inverted_continuous_burns: list[maneuvers.ContinuousBurn] = []
 
-        # Sort the scheduled burns into separate continuous and impulsive burn lists. Don't sort them yet, this is
+        # Sort the scheduled burns into separate continuous.rst and impulsive burn lists. Don't sort them yet, this is
         # handled by the Mission class.
         if burns is not None:
             for burn in burns:

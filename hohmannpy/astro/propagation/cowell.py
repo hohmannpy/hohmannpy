@@ -19,6 +19,14 @@ class CowellPropagator(base.Propagator):
     :class:`~hohmannpy.astro.NonSphericalEarth`. However, in addition the accuracy of the propagation decreases over
     time as opposed to a Keplerian propagator which has a fixed accuracy. To mitigate this decrease the step size.
 
+    Parameters
+    ----------
+    step_size : float
+        Time interval between propagation steps. If one is not provided by the user it will be set in
+        :meth:`propagate()` to 60 :math:`s`.
+
+    Attributes
+    ----------
     step_size : float
         Time interval between propagation steps. If one is not provided by the user it will be set in
         :meth:`propagate()` to 60 :math:`s`.
@@ -65,8 +73,8 @@ class CowellPropagator(base.Propagator):
         # steps taken (for a given satellite on a given timestep) are as follows:
         #   1) Set the next "standard time" of propagation to be the current time + timestep.
         #   2) Start a true loop that iterates through all events scheduled between the current time and the next
-        #       "standard time". An event can be one of three things: an impulsive burn, a continuous burn starting, or
-        #       a continuous burn ending.
+        #       "standard time". An event can be one of three things: an impulsive burn, a continuous.rst burn starting, or
+        #       a continuous.rst burn ending.
         #   3) For each of these event types, determine when the next will occur (if any). Then, out of these determine
         #       which event will occur next.
         #   4) For each iteration of the loop, take a mini-timestep from the current time to the time of the next event.
@@ -79,9 +87,9 @@ class CowellPropagator(base.Propagator):
         #           i) Increment the satellite's continuous_burn_start_index by 1.
         #       Continuous burn end:
         #           i) Increment the satellite's continuous_burn_end_index by 1.
-        #       Note that the actual application acceleration due to the continuous burn is handled independently of
+        #       Note that the actual application acceleration due to the continuous.rst burn is handled independently of
         #       this loop by eom(). This loop simply ensures that the discrete time grid includes the exact times at
-        #       which a continuous burn starts and stops to prevent discontinuities in integration.
+        #       which a continuous.rst burn starts and stops to prevent discontinuities in integration.
         #   6) Repeat 3-5 until all events scheduled before the next standard time are completed.
         #   7) Take a mini-timestep from the time of the last event till the next standard time. Then, propagate over
         #       this mini-timestep.
@@ -153,7 +161,7 @@ class CowellPropagator(base.Propagator):
                     self.step(name, satellite, self.step_size)
 
     def step(self, satellite, time_change):
-        """
+        r"""
         One step in the propagation loop.
 
         Parameters
@@ -236,7 +244,7 @@ class CowellPropagator(base.Propagator):
                 y4_dot += y4_perturb
                 y5_dot += y5_perturb
 
-        # Append active continuous burns.
+        # Append active continuous.rst burns.
         for burn in satellite.continuous_burns:
             if burn.start_time <= t <= burn.end_time:  # Check if burn is active.
                 y3_perturb, y4_perturb, y5_perturb = burn.evaluate(t, y, satellite)

@@ -122,7 +122,7 @@ class DynamicRenderEngine(base.RenderEngine):
         # Add additional event handling.
         self.canvas.add_event_handler(self.time_event_handler, "key_down")
 
-        # If using UI (currently just groundtracks).
+        # If using UI (currently just groundtracks.rst).
         self.draw_groundtracks = draw_groundtracks
         if self.draw_groundtracks:
             self.gt_engine = groundtrack.GroundtrackRenderEngine(satellites, initial_global_time)

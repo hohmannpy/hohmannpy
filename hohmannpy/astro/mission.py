@@ -124,7 +124,7 @@ class Mission:
                 if burn.start_time < 0:
                     raise ValueError("Burns may only be scheduled for after the start of the mission.")
 
-                # Safeguard to ensure Keplerian propagators are not used with continuous burns.
+                # Safeguard to ensure Keplerian propagators are not used with continuous.rst burns.
                 if ((isinstance(self.propagator, propagation.KeplerPropagator) or
                     isinstance(self.propagator, propagation.UniversalVariablePropagator))
                     and not isinstance(self.propagator, propagation.EnckePropagator)
@@ -225,7 +225,7 @@ class Mission:
 
     @staticmethod
     def _parallel_propagate(args: tuple[propagation.Propagator, dict[str, spacecraft.Satellite], float, list[perturbations.Perturbation]]) -> None:
-        """
+        r"""
         Parallel processing helper function.
 
         This takes in all the values needed by each parallel processing instance in order to call
@@ -266,7 +266,7 @@ class Mission:
             rendering will launch. Otherwise, a static rendering will be used.
         """
 
-        if display_flag == "dynamic-groundtracks":
+        if display_flag == "dynamic-groundtracks.rst":
             engine = rendering.DynamicRenderEngine(
                 satellites=self.satellites,
                 runtime=(self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400,

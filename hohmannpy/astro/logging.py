@@ -42,7 +42,7 @@ class Logger(ABC):
             How many timesteps to log the data for.
         burns : int
             How many burns to log data for. Two points are logged for each burn. For impulsive burns this is the
-            immediately before and after the impulse (two data points on the same timestep). For continuous burns this
+            immediately before and after the impulse (two data points on the same timestep). For continuous.rst burns this
             is the start and end times of the burn. These additional points are included for precision purposes.
 
         Notes

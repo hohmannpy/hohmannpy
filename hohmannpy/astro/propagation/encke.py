@@ -14,8 +14,10 @@ if TYPE_CHECKING:
 # TODO: Investigating implementing functools.cache for Taylor series.
 class EnckePropagator(universal_variable.UniversalVariablePropagator):
     r"""
-    Non-Keplerian propagator which uses a modified set of equations of motion where the position is given by:
+    Non-Keplerian propagator which uses a modified set of equations of motion where the position is given by::
+
         true positon = Keplerian position + perturbation from Keplerian position
+
     The Keplerian position comes from what is known as the "reference" orbit and is propagated using the universal
     variable formulation of Kepler's equation. The perturbation is the difference between the true position and
     Keplerian position and this is found via numerical integration using a 4th-order Runge-Kutta method. These are
@@ -28,6 +30,8 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
     integration errors are smaller when they compound for a smaller value. If accuracy is still an issue, reduce step
     size.
 
+    Parameters
+    ----------
     step_size : float
         Time interval between propagation steps. If one is not provided by the user it will be set in
         :meth:`propagate()` to 60 :math:`s`.
@@ -54,6 +58,20 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         parameter being under ``stumpff_tol``.
     stumpff_series_length : int
         When the Stumpff series are computed via summation, how many terms to include.
+
+    Attributes
+    ----------
+    rectification_tol : float
+        When the deviation between the true and reference orbits grows large enough (represented by the ratio of their
+        positions' magnitudes being greater than this tolerance), reset the rectified orbit by setting it equal to the
+        current true orbit.
+    encke_tol : float
+        When the Encke parameter is close to zero (defined by this tolerance) the Encke function, which is used to
+        compute the position, is undefined so must switch to an infinite series definition of it.
+    encke_series_length : int
+        How many terms to include when using the infinite series definition of the Encke function.
+    reference_orbits : dict[str, :class:`~hohmannpy.astro.Orbit`]
+        Keplerian orbits used as references to measure deviations of the true orbit from the Keplerian approximation.
     """
 
     def __init__(
@@ -134,8 +152,8 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         # steps taken (for a given satellite on a given timestep) are as follows:
         #   1) Set the next "standard time" of propagation to be the current time + timestep.
         #   2) Start a true loop that iterates through all events scheduled between the current time and the next
-        #       "standard time". An event can be one of three things: an impulsive burn, a continuous burn starting, or
-        #       a continuous burn ending.
+        #       "standard time". An event can be one of three things: an impulsive burn, a continuous.rst burn starting, or
+        #       a continuous.rst burn ending.
         #   3) For each of these event types, determine when the next will occur (if any). Then, out of these determine
         #       which event will occur next.
         #   4) For each iteration of the loop, take a mini-timestep from the current time to the time of the next event.
@@ -148,9 +166,9 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         #           i) Increment the satellite's continuous_burn_start_index by 1.
         #       Continuous burn end:
         #           i) Increment the satellite's continuous_burn_end_index by 1.
-        #       Note that the actual application acceleration due to the continuous burn is handled independently of
+        #       Note that the actual application acceleration due to the continuous.rst burn is handled independently of
         #       this loop by eom(). This loop simply ensures that the discrete time grid includes the exact times at
-        #       which a continuous burn starts and stops to prevent discontinuities in integration.
+        #       which a continuous.rst burn starts and stops to prevent discontinuities in integration.
         #   6) Repeat 3-5 until all events scheduled before the next standard time are completed.
         #   7) Take a mini-timestep from the time of the last event till the next standard time. Then, propagate over
         #       this mini-timestep.
@@ -238,7 +256,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
                     self.step(name, satellite, self.step_size)
 
     def step(self, name, satellite, time_change):
-        """
+        r"""
         One step in the propagation loop.
 
         Parameters
@@ -319,7 +337,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         self.log(satellite)
 
     def reference_step(self, name, time_change):
-        """
+        r"""
         Perform propagation using the universal variable form of Kepler's method for the reference orbit.
 
         Parameters
@@ -378,9 +396,10 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         these values are small an alternative formulation using what are known as the Encke function and parameter are
         instead used.
 
-        The perturbing accelerations are then added by calling :class:`~hohmannpy.astro.Perturbation` .
-        :class:`~hohmannpy.astro.Perturbation.evaluate()` for each perturbation in ``perturbing_forces`` as well as any
-        :class:`~hohmannpy.astro.ContinuousBurns` from ``satellite.continuous_burns``.
+        The perturbing accelerations are then added by calling
+        :class:`~hohmannpy.astro.Perturbation` . :meth:`~hohmannpy.astro.Perturbation.evaluate()` for each perturbation
+        in ``perturbing_forces`` as well as any :class:`~hohmannpy.astro.ContinuousBurns` from
+        ``satellite.continuous_burns``.
 
         Parameters
         ----------
@@ -442,7 +461,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
                 del_y4_dot += y4_perturb
                 del_y5_dot += y5_perturb
 
-        # Append active continuous burns.
+        # Append active continuous.rst burns.
         for burn in satellite.continuous_burns:
             if burn.start_time <= t <= burn.end_time:  # Check if burn is active.
                 y3_perturb, y4_perturb, y5_perturb = burn.evaluate(t, y, satellite)

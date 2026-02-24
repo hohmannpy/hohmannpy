@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class Groundtrack:
-    """
+    r"""
     The groundtrack of a :class:`~hohmannpy.astro.Satellite` projected onto an ellipsoidal Earth.
 
     These are stored as geodetic latitude and longitude history arrays. Note that for this class to work, the
