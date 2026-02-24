@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from .. import spacecraft, perturbations
 
 
-# TODO: Document burn logic.
 class KeplerPropagator(base.Propagator):
     r"""
     Propagates orbits using an f and g functions as well as Kepler's equation.
@@ -56,6 +55,7 @@ class KeplerPropagator(base.Propagator):
         self.fg_constraint = fg_constraint
         self.solver_tol = solver_tol
 
+        # Empty dicts containing initial conditions that get filled in propagate().
         self.initial_times = {}
         self.initial_positions = {}
         self.initial_velocities = {}
@@ -111,28 +111,50 @@ class KeplerPropagator(base.Propagator):
                 logger.setup(initial_orbit=satellite.orbit, timesteps=self.timesteps, burns=burns)
 
         # Begin the actual propagation loop. This is made of two loops: timesteps (outer), satellites (inner).
-        # For each satellite,
+        # This involves a lot of logic surrounding burns which boils down to just determining when to call step(). The
+        # steps taken (for a given satellite on a given timestep) are as follows:
+        #   1) Set the next "standard time" of propagation to be the current time + timestep.
+        #   2) Start a true loop that iterates through all burns scheduled between the current time and the next
+        #       "standard time".
+        #   3) For each iteration of the loop, take a mini-timestep from the current time to the time of the next burn.
+        #       Then, propagate over this mini-timestep.
+        #   4) Only impulsive burns possible (Keplerian propagator), so add the change in velocity.
+        #   5) Update the orbital elements after the impulse and log the results manually.
+        #   6) Reset the initial values used for propagation to match the new orbit.
+        #   7) Repeat 3-6 until all burns scheduled before the next standard time are completed.
+        #   8) Take a mini-timestep from the time of the last burn till the next standard time. Then, propagate over
+        #       this mini-timestep.
         for timestep in range(self.timesteps):
             for name, satellite in self.satellites.items():
-                if len(satellite.impulsive_burns) > 0:
+                if satellite.impulsive_burns:  # Skip this step if no burns are scheduled.
                     next_std_time = satellite.orbit.time + self.step_size
 
+                    # Burn loop.
                     while True:
+                        # Fetch next burn. Each time a burn happens the impulsive_burn_index is incremented, and if this
+                        # is equivalent to the number of scheduled burns than all burns are complete, and we can break
+                        # from the loop.
                         if satellite.impulsive_burn_index < len(satellite.impulsive_burns):
                             burn = satellite.impulsive_burns[satellite.impulsive_burn_index]
                         else:
                             break
 
+                        # If this burn would occur before next_std_time, propagate to its burn time and then perform the
+                        # burn.
                         if next_std_time >= burn.start_time:
                             satellite.orbit.time = burn.start_time
                             self.step(name, satellite)
 
                             burn.evaluate(satellite)
 
+                            # Update elements because evaluate() does not automatically change orbital parameters.
                             satellite.orbit.update_classical()
                             if satellite.orbit.track_equinoctial:
                                 satellite.orbit.update_equinoctial()
 
+                            # Keplerian propagation is not possible over changes in angular momentum, so need to restart
+                            # propagation (hence find new initial conditions) at the point immediately after the burn
+                            # occurs.
                             self.initial_times[name] = satellite.orbit.time
                             self.initial_positions[name] = satellite.orbit.position.copy()
                             self.initial_velocities[name] = satellite.orbit.velocity.copy()
@@ -144,13 +166,15 @@ class KeplerPropagator(base.Propagator):
                             )
                             satellite.orbit.eccentric_anomaly = self.initial_eccentric_anomalies[name]
 
-                            self.log(satellite)
+                            self.log(satellite)  # Log this data because it isn't logged in evaluate().
                         else:
                             break
 
+                    # After all burns, increment to the next_std_time and perform normal propagation.
                     satellite.orbit.time = next_std_time
                     self.step(name, satellite)
 
+                # No burns, so simply propagate to next standard time.
                 else:
                     satellite.orbit.time += self.step_size
                     self.step(name, satellite)
@@ -158,6 +182,13 @@ class KeplerPropagator(base.Propagator):
     def step(self, name, satellite):
         """
         One step in the propagation loop.
+
+        Parameters
+        ----------
+        name : str
+            Name of the satellite being propagated.
+        satellite: :class:`~hohmannpy.astro.Satellite`
+            Satellite being propagated. Holds the orbit to propagate as an attribute named ``orbit``.
         """
 
         # First retrieve the orbit. Then determine if the orbit is elliptic or hyperbolic based on

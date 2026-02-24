@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from .. import spacecraft, perturbations
 
 
-# TODO: Document burn logic.
 class CowellPropagator(base.Propagator):
     r"""
     Simplest non-Keplerian propagate which numerically integrates the equations of motion of a satellite using a
@@ -61,12 +60,40 @@ class CowellPropagator(base.Propagator):
                 logger.setup(initial_orbit=satellite.orbit, timesteps=self.timesteps, burns=burns)
 
         # Begin the actual propagation loop. This is made of two loops: timesteps (outer), satellites (inner).
+        # This involves a lot of logic surrounding burns which boils down to just determining when to call step(). The
+        # steps taken (for a given satellite on a given timestep) are as follows:
+        #   1) Set the next "standard time" of propagation to be the current time + timestep.
+        #   2) Start a true loop that iterates through all events scheduled between the current time and the next
+        #       "standard time". An event can be one of three things: an impulsive burn, a continuous burn starting, or
+        #       a continuous burn ending.
+        #   3) For each of these event types, determine when the next will occur (if any). Then, out of these determine
+        #       which event will occur next.
+        #   4) For each iteration of the loop, take a mini-timestep from the current time to the time of the next event.
+        #       Then, propagate over this mini-timestep.
+        #   5) The next action depends on the type of event.
+        #       Impulsive burn:
+        #           i) Add the change in velocity.
+        #           ii) Update the orbital elements after the impulse and log the results manually.
+        #       Continuous burn start:
+        #           i) Increment the satellite's continuous_burn_start_index by 1.
+        #       Continuous burn end:
+        #           i) Increment the satellite's continuous_burn_end_index by 1.
+        #       Note that the actual application acceleration due to the continuous burn is handled independently of
+        #       this loop by eom(). This loop simply ensures that the discrete time grid includes the exact times at
+        #       which a continuous burn starts and stops to prevent discontinuities in integration.
+        #   6) Repeat 3-5 until all events scheduled before the next standard time are completed.
+        #   7) Take a mini-timestep from the time of the last event till the next standard time. Then, propagate over
+        #       this mini-timestep.
         for timestep in range(1, self.timesteps + 1):
             for name, satellite in self.satellites.items():
-                if satellite.impulsive_burns or satellite.continuous_burns:
+                if satellite.impulsive_burns or satellite.continuous_burns:  # Skip this step if no burns are scheduled.
                     next_std_time = satellite.orbit.time + self.step_size
 
+                    # Event loop.
                     while True:
+                        # For each event type fetch the next event's time. Each time a burn happens the event's index is
+                        # incremented, and if this is equivalent to the number of events of that type than all events of
+                        # that type are complete. If this is true set the event time to None.
                         if satellite.impulsive_burn_index < len(satellite.impulsive_burns):
                             impulsive_burn = satellite.impulsive_burns[satellite.impulsive_burn_index]
                             next_impulsive_time = impulsive_burn.start_time
@@ -85,6 +112,9 @@ class CowellPropagator(base.Propagator):
                         else:
                             next_continuous_end_time = None
 
+                        # Construct a dict out of the soonest upcoming times of each type. Note that at this point
+                        # these events may occur after next_std_time. We then use list comprehension to remove None
+                        # values. Then select the event that will occur soonest.
                         candidate_events = [
                             ("impulsive", next_impulsive_time),
                             ("continuous_start", next_continuous_start_time),
@@ -95,6 +125,8 @@ class CowellPropagator(base.Propagator):
                             break
                         event_type, next_event_time = min(valid_events, key=lambda x: x[1])
 
+                        # If this event would occur before next_std_time, propagate to its event time and then perform
+                        # the necessary logic.
                         if next_std_time >= next_event_time:
                             if event_type == "impulsive":
                                 self.step(name, satellite, next_event_time - satellite.orbit.time)
@@ -102,28 +134,39 @@ class CowellPropagator(base.Propagator):
                                 satellite.orbit.update_classical()
                                 if satellite.orbit.track_equinoctial:
                                     satellite.orbit.update_equinoctial()
-                                self.log(satellite)
+                                self.log(satellite)  # Log this data because it isn't logged in evaluate().
                             elif event_type == "continuous_start":
                                 self.step(name, satellite, next_event_time - satellite.orbit.time)
-                                satellite.continuous_burn_start_index += 1
+                                satellite.continuous_burn_start_index += 1  # No evaluate() so update index manually.
                             elif event_type == "continuous_end":
                                 self.step(name, satellite, next_event_time - satellite.orbit.time)
                                 satellite.continuous_burn_end_index += 1
                         else:
                             break
 
+                    # After all events, increment to the next_std_time and perform normal propagation.
                     self.step(name, satellite, next_std_time - satellite.orbit.time)
 
+                # No events, so simply propagate to next standard time.
                 else:
                     self.step(name, satellite, self.step_size)
 
-    def step(self, name, satellite, time_change):
+    def step(self, satellite, time_change):
         """
         One step in the propagation loop.
+
+        Parameters
+        ----------
+        satellite: :class:`~hohmannpy.astro.Satellite`
+            Satellite being propagated. Holds the orbit to propagate as an attribute named ``orbit``.
+        time_change : float
+            Change in time to propagate over.
         """
 
-        # Step the state and position forward by one timestep
+        # For each satellite, first retrieve the orbit. Then step the state and position forward by one timestep using
+        # RK4 integration of the satellite's EOM.
         orbit = satellite.orbit
+
         state = self.rk4(
             t0=orbit.time,
             delt=time_change,
@@ -153,7 +196,8 @@ class CowellPropagator(base.Propagator):
 
         The default acceleration is the two-body acceleration due to the point mass acceleration of the central body.
         The perturbing accelerations are then added by calling :class:`~hohmannpy.astro.Perturbation` .
-        :class:`~hohmannpy.astro.Perturbation.evaluate()` for each perturbation in ``perturbing_forces``.
+        :class:`~hohmannpy.astro.Perturbation.evaluate()` for each perturbation in ``perturbing_forces`` as well as any
+        :class:`~hohmannpy.astro.ContinuousBurns` from ``satellite.continuous_burns``.
 
         Parameters
         ----------
@@ -167,7 +211,7 @@ class CowellPropagator(base.Propagator):
 
         Returns
         -------
-        acceleration: np.ndarray
+        y_dot: np.ndarray
             (6, ) array corresponding the derivative of the satellite's current state as (velocity, acceleration).
         """
 
@@ -191,8 +235,9 @@ class CowellPropagator(base.Propagator):
                 y4_dot += y4_perturb
                 y5_dot += y5_perturb
 
+        # Append active continuous burns.
         for burn in satellite.continuous_burns:
-            if burn.start_time <= t <= burn.end_time:
+            if burn.start_time <= t <= burn.end_time:  # Check if burn is active.
                 y3_perturb, y4_perturb, y5_perturb = burn.evaluate(t, y, satellite)
                 y3_dot += y3_perturb
                 y4_dot += y4_perturb
@@ -203,8 +248,8 @@ class CowellPropagator(base.Propagator):
     def rk4(
             self,
             t0: float,
-            delt: float,
             y0: np.ndarray,
+            delt: float,
             satellite: spacecraft.Satellite
     ) -> np.ndarray:
         r"""
@@ -216,6 +261,8 @@ class CowellPropagator(base.Propagator):
             Base time point at which to start integration step.
         y0 : np.ndarray
             Base state point at which to start integration step.
+        delt : float
+            Time increment to propagate over.
         satellite : :class:`~hohmannpy.astro.Satellite`
             The satellite whose orbit is being propagated. Do not access the position and velocity of the satellite
             through its ``orbit`` attribute. Only use this to access static properties like ``orbit.grav_param``.
@@ -224,7 +271,6 @@ class CowellPropagator(base.Propagator):
         -------
         y: np.ndarray
             Approximated state at time t0 + step_size.
-
         """
 
         x1 = self.eom(t0, y0, satellite)
