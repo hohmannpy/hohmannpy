@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from .. import spacecraft, perturbations
 
 
+# TODO: Investigating implementing functools.cache for Taylor series.
 class EnckePropagator(universal_variable.UniversalVariablePropagator):
     r"""
     Non-Keplerian propagator which uses a modified set of equations of motion where the position is given by:

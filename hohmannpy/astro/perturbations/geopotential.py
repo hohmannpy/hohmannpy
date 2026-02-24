@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from .. import spacecraft
 
 
+# TODO: Investigating implementing functools.cache for Taylor series.
 class NonSphericalEarth(base.Perturbation):
     r"""
     Perturbation caused by the deviations of the Earth's math distribution from a point-mass.

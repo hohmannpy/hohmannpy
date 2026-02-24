@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from .. import spacecraft, perturbations
 
 
+# TODO: Investigating implementing functools.cache for Taylor series.
 class CowellPropagator(base.Propagator):
     r"""
     Simplest non-Keplerian propagate which numerically integrates the equations of motion of a satellite using a
