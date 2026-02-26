@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from . import orbit
+    from . import orbits
 
 
 class Logger(ABC):

@@ -160,12 +160,14 @@ class CowellPropagator(base.Propagator):
                 else:
                     self.step(name, satellite, self.step_size)
 
-    def step(self, satellite, time_change):
+    def step(self, name, satellite, time_change):
         r"""
         One step in the propagation loop.
 
         Parameters
         ----------
+        name : str
+            Name of the satellite being propagated.
         satellite: :class:`~hohmannpy.astro.Satellite`
             Satellite being propagated. Holds the orbit to propagate as an attribute named ``orbit``.
         time_change : float

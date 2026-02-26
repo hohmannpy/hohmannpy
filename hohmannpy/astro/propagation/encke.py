@@ -5,7 +5,7 @@ import numpy as np
 import scipy as sp
 
 from . import base, universal_variable
-from ..orbit import Orbit
+from .. import orbits
 
 if TYPE_CHECKING:
     from .. import spacecraft, perturbations
@@ -128,7 +128,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
             self.initial_positions[name] = satellite.orbit.position.copy()
             self.initial_velocities[name] = satellite.orbit.velocity.copy()
 
-            self.reference_orbits[name] = Orbit.from_state(
+            self.reference_orbits[name] = orbits.Orbit.from_state(
                 position=satellite.orbit.position.copy(),
                 velocity=satellite.orbit.velocity.copy(),
                 grav_param=satellite.orbit.grav_param
@@ -434,6 +434,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
                     + del_y[2] * (y_ref[2] + 0.5 * del_y[2])
         )
 
+        # TODO: Validate this Taylor series by hand.
         if abs(encke_param) < self.encke_tol:
             encke_func = 0
             for i in range(self.encke_series_length):

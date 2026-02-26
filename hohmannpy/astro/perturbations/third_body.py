@@ -6,7 +6,7 @@ import numpy as np
 import scipy as sp
 
 from ...dynamics import dcms
-from .. import propagation, time, spacecraft, logging, orbit
+from .. import propagation, time, spacecraft, logging, orbits
 from . import base
 
 
@@ -284,7 +284,7 @@ class SolarGravity(ThirdBodyGravity):
         # the Earth on its orbit). That isn't passed in till finalize__init__() is called so create a temporary dummy
         # third body. We'll replace it with the Earth in the aforementioned function.
         dummy_third_body = spacecraft.Satellite(
-            starting_orbit=orbit.Orbit(
+            starting_orbit=orbits.Orbit(
                 position=np.array([1, 1, 1]),
                 velocity=np.array([0, 0, 1]),
             ),

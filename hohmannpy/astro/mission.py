@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 from . import propagation, perturbations, time, logging, spacecraft
-from ..ui import rendering
+from ..ui import application
 
 
 class Mission:
@@ -252,40 +252,15 @@ class Mission:
 
         return satellites
 
-    def display(self, display_flag = "dynamic"):
+    def display(self):
         r"""
-        Display the orbits of all satellites using :class:`~hohmannpy.ui.RenderEngine` or
-        :class:`~hohmannpy.ui.DynamicRenderEngine`.
+        Display the orbits of all satellites using a Qt application.
 
         This should only be called after ``simulate()`` is run.
-
-        Parameters
-        ----------
-        display_flag : str
-            Flag which indicates what type of rendering to use for the mission. If set to "dynamic" a real-time
-            rendering will launch. Otherwise, a static rendering will be used.
         """
 
-        if display_flag == "dynamic-groundtracks.rst":
-            engine = rendering.DynamicRenderEngine(
-                satellites=self.satellites,
-                runtime=(self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400,
-                initial_global_time=self.initial_global_time,
-                draw_groundtracks=True
-            )
-        elif display_flag == "dynamic":
-            engine = rendering.DynamicRenderEngine(
-                satellites=self.satellites,
-                runtime=(self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400,
-                initial_global_time=self.initial_global_time,
-                draw_groundtracks=False
-            )
-        else:
-            engine = rendering.RenderEngine(
-                satellites=self.satellites,
-            )
-
-        engine.render()  # Command which actually launches the graphical application.
+        sim_manager = application.SimManager(self.satellites, self.initial_global_time, self.final_global_time)
+        sim_manager.run()
 
     def to_csv(self, target_directory: str, fp_accuracy: int):
         r"""
