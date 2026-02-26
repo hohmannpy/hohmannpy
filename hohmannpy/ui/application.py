@@ -24,6 +24,8 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         toolbar.setMovable(False)
         toolbar.setFloatable(False)
         toolbar.horizon_display.mode_changed.connect(self.set_horizon)
+        toolbar.horizon_display.custom_horizon.connect(self.set_custom_horizon)
+        toolbar.rso_table.rso_table.connect(self.open_rso_table)
 
         orbit_viewer = rendering.orbits.OrbitRenderer(self.sim)
         gt_viewer = rendering.GroundtrackRenderer()
@@ -51,6 +53,46 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
     def set_horizon(self, signal):
         self.elements["orbit"].display_mode = signal
 
+    @PySide6.QtCore.Slot(float)
+    def set_custom_horizon(self, signal):
+        self.elements["orbit"].custom_horizon = signal
+
+    def open_rso_table(self):
+        dialog = PySide6.QtWidgets.QDialog(self)
+        dialog.setWindowTitle("RSOs")
+        dialog.resize(300, 500)
+
+        main_layout = PySide6.QtWidgets.QVBoxLayout(dialog)
+
+        table = PySide6.QtWidgets.QTableWidget()
+        names = list(self.sim.satellites.keys())
+
+        table.setRowCount(len(names))
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels(["Name", "Display"])
+
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, PySide6.QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode(1, PySide6.QtWidgets.QHeaderView.ResizeToContents)
+        table.setEditTriggers(PySide6.QtWidgets.QAbstractItemView.NoEditTriggers)
+
+        for i, name in enumerate(names):
+            table.setItem(i, 0, PySide6.QtWidgets.QTableWidgetItem(name))
+
+            checkbox = PySide6.QtWidgets.QCheckBox()
+            checkbox.setChecked(True)
+
+            cell_widget = PySide6.QtWidgets.QWidget()
+            cell_layout = PySide6.QtWidgets.QHBoxLayout(cell_widget)
+            cell_layout.setContentsMargins(0, 0, 0, 0)
+            cell_layout.setAlignment(PySide6.QtCore.Qt.AlignCenter)
+            cell_layout.addWidget(checkbox)
+
+            table.setCellWidget(i, 1, cell_widget)
+
+        main_layout.addWidget(table)
+        dialog.exec()
+
 class SimManager:
     def __init__(
             self,
@@ -69,17 +111,17 @@ class SimManager:
         self.speed_factor = 100
 
         for name, satellite in self.satellites.items():
-            sparse_times = satellite.time_history.squeeze()
-            for i in range(1, len(sparse_times)):
-                if sparse_times[i] <= sparse_times[i - 1]:
-                    sparse_times[i] = sparse_times[i - 1] + 1e-9
-            sparse_positions = satellite.position_history.T / 1000
+            times = satellite.time_history
+            for i in range(1, len(times)):
+                if times[i] <= times[i - 1]:
+                    times[i] = times[i - 1] + 1e-9
+            positions = satellite.position_history.T / 1000
 
             self.orbit_splines[name] = (
                 sp.interpolate.make_interp_spline(
                     times.squeeze(),
-                    ,
-                    k=1
+                    positions,
+                    k=3
                 )
             )
 
