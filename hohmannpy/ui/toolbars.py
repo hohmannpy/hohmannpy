@@ -11,11 +11,14 @@ class ToolBar(PySide6.QtWidgets.QToolBar):
         self.rso_table = RSOTableButton()
         self.orbit_display = OrbitDisplayModeButton()
         self.sim_speed = SimSpeedButton()
+        self.play_pause = PlayPauseButton()
 
+        # Add buttons to toolbar.
         self.addWidget(self.rso_table)
         self.addWidget(self.sim_speed)
         self.addWidget(self.horizon_display)
         self.addWidget(self.orbit_display)
+        self.addWidget(self.play_pause)
 
 class RSOTableButton(PySide6.QtWidgets.QToolButton):
     rso_table = PySide6.QtCore.Signal()
@@ -157,3 +160,23 @@ class SimSpeedButton(PySide6.QtWidgets.QToolButton):
 
         self.setMenu(menu)
         self.setPopupMode(PySide6.QtWidgets.QToolButton.InstantPopup)
+
+
+class PlayPauseButton(PySide6.QtWidgets.QPushButton):
+    mode_changed = PySide6.QtCore.Signal(str)
+
+    def __init__(self):
+        super().__init__()
+
+        self.play_icon = self.style().standardIcon(PySide6.QtWidgets.QStyle.SP_MediaPlay)
+        self.pause_icon = self.style().standardIcon(PySide6.QtWidgets.QStyle.SP_MediaPause)
+        self.setIcon(self.pause_icon)
+        self.setCheckable(True)
+        self.setChecked(True)
+
+
+class ResetButton(PySide6.QtWidgets.QToolButton):
+    reset = PySide6.QtCore.Signal(str)
+
+    def __init__(self):
+        super().__init__()

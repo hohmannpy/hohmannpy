@@ -167,6 +167,8 @@ class Mission:
                     perturbation.finalize__init__(self.initial_global_time, self.final_global_time)
                 if isinstance(perturbation, perturbations.NonSphericalEarth):
                     perturbation.finalize__init__(self.initial_global_time.gmst)
+                if isinstance(perturbation, perturbations.J2):
+                    perturbation.finalize__init__(self.initial_global_time.gmst)
                 if isinstance(perturbation, perturbations.ThirdBodyGravity):
                     perturbation.finalize__init__(self.initial_global_time, self.final_global_time)
 
@@ -258,6 +260,11 @@ class Mission:
 
         This should only be called after ``simulate()`` is run.
         """
+
+        # Check to make sure trajectories were logged.
+        loggers = next(iter(self.satellites.values())).loggers
+        if not any(isinstance(logger, logging.StateLogger) for logger in loggers):
+            raise AttributeError("No StateLogger stored for this mission, can not generate trajectories for display.")
 
         sim_manager = application.SimManager(self.satellites, self.initial_global_time, self.final_global_time)
         sim_manager.run()

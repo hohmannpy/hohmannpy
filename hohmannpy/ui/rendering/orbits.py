@@ -126,7 +126,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         # For each satellite, generate the dense trajectory from the spline and then create the corresponding
         # color_chunk. Then append these to the chunk lists.
         for name, satellite in self.sim.satellites.items():
-            self.positions[name] = self.sim.orbit_splines[name](self.dense_times)
+            self.positions[name] = self.sim.splines["positions"][name](self.dense_times)
             self.positions[name] = self.positions[name].astype(np.float32)  # Data type needed by gfx.Geometry.
 
             color = np.array(gfx.Color(satellite.color), dtype=np.float32)
@@ -140,7 +140,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         orbit_buffer = np.vstack(position_chunks)
         color_buffer = np.vstack(color_chunks)
         self.objects["orbits_polyline"] = gfx.Line(
-            geometry=gfx.Geometry(positions=orbit_buffer, colors=color_buffer.copy()),
+            geometry=gfx.Geometry(positions=orbit_buffer, colors=color_buffer),
             material=gfx.LineMaterial(color_mode="vertex")
         )
 
@@ -153,7 +153,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         color_chunks = []
 
         for name, satellite in self.sim.satellites.items():
-            satellite_chunks.append(self.sim.orbit_splines[name](0).astype(np.float32))
+            satellite_chunks.append(self.sim.splines["positions"][name](0).astype(np.float32))
             color_chunks.append(np.array(gfx.Color(satellite.color)).astype(np.float32))
 
         satellite_buffer = np.vstack(satellite_chunks)
@@ -200,42 +200,44 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
 
         for name in self.sim.satellites.keys():
             if self.orbit_display_mode != "rso":
-                match self.horizon_display_mode:
-                    case "none":
-                        lower_index = 0
-                        upper_index = 0
-                    case "full":
-                        lower_index = 0
-                        upper_index = len(self.dense_times)
-                    case "past":
-                        lower_index = 0
-                        upper_index = np.searchsorted(self.dense_times, self.sim.sim_time)
-                    case "hour":
-                        lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 30)
-                        upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 30)
-                    case "half_day":
-                        lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60 * 6)
-                        upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60 * 6)
-                    case "day":
-                        lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60 * 12)
-                        upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60 * 12)
-                    case "custom":
-                        lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - self.custom_horizon)
-                        upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + self.custom_horizon)
+                if self.sim.satellite_display_flags[name]:
+                    match self.horizon_display_mode:
+                        case "none":
+                            lower_index = 0
+                            upper_index = 0
+                        case "full":
+                            lower_index = 0
+                            upper_index = len(self.dense_times)
+                        case "past":
+                            lower_index = 0
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time)
+                        case "hour":
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 30)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 30)
+                        case "half_day":
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60 * 6)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60 * 6)
+                        case "day":
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60 * 12)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60 * 12)
+                        case "custom":
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - self.custom_horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + self.custom_horizon)
 
-                # For the portion of the orbit_buffer corresponding to this satellite's trajectory (found via
-                # base_index) set the rows between lower and upper index to their actual values.
-                self.orbit_buffer[base_orbit_index + lower_index: base_orbit_index + upper_index, :] = (
-                    self.positions[name][lower_index:upper_index, :]
-                )
+                    # For the portion of the orbit_buffer corresponding to this satellite's trajectory (found via
+                    # base_index) set the rows between lower and upper index to their actual values.
+                    self.orbit_buffer[base_orbit_index + lower_index: base_orbit_index + upper_index, :] = (
+                        self.positions[name][lower_index:upper_index, :]
+                    )
                 base_orbit_index += self.positions[name].shape[0] + 1  # Move to start of next satellite's trajectory.
 
             # Update the satellite's positions using similar logic as with the orbits.
             if self.orbit_display_mode != "traj":
-                self.satellite_buffer[base_satellite_index, :] = (
-                    self.sim.orbit_splines[name](self.sim.sim_time).astype(np.float32)
-                )
-            base_satellite_index += 1
+                if self.sim.satellite_display_flags[name]:
+                    self.satellite_buffer[base_satellite_index, :] = (
+                        self.sim.splines["positions"][name](self.sim.sim_time).astype(np.float32)
+                    )
+                base_satellite_index += 1
 
         # Rebuild buffers.
         self.objects["orbits_polyline"].geometry.positions.set_data(

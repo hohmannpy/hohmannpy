@@ -202,11 +202,6 @@ class J2(base.Perturbation):
     This is a simplified version of :class:`~hohmannpy.astro.perturbations.NonSphericalEarth` intended for us in
     modeling purely the J2 effect. The J2-acceleration is computed explicitly using general perturbation theory.
 
-    Parameters
-    ----------
-    gmst : float
-        Current angle of the Greenwich meridian in :math:`rad`.
-
     Attributes
     ----------
     initial_gmst : float
@@ -228,10 +223,25 @@ class J2(base.Perturbation):
         N-order zonal harmonic effects as well as tesseral and sectoral ones.
     """
 
-    def __init__(self, gmst):
+    def __init__(self):
         super().__init__()
 
-        self.initial_gmst = gmst
+        self.initial_gmst = None
+
+    def finalize__init__(self, initial_gmst: float):
+        """
+        Record the initial GMST of the Earth which is used to correctly orient it for geopotential modeling.
+
+        This is needed by :meth:`evaluate()` but can't be passed to the base ``__init__()``. This is called during
+        :class:`~hohmannpy.astro.Mission`'s instantiation.
+
+        Parameters
+        ----------
+        initial_gmst : float
+            Initial angle of the Greenwich meridian in :math:`rad`.
+        """
+
+        self.initial_gmst = initial_gmst
 
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""
