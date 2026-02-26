@@ -1,8 +1,10 @@
 import time
 import sys
+import importlib.resources
 
 import PySide6.QtWidgets
 import PySide6.QtCore
+import PySide6.QtGui
 import scipy as sp
 import numpy as np
 
@@ -13,7 +15,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
     def __init__(self, sim):
         super().__init__()
         self.sim = sim
-        self.setWindowTitle("HohmannPy")
+        self.setWindowTitle("HohmannPy Viewer")
         self.resize(1280, 720)
 
         tabs = PySide6.QtWidgets.QTabWidget()
@@ -26,14 +28,16 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         toolbar.horizon_display.mode_changed.connect(self.set_horizon)
         toolbar.horizon_display.custom_horizon.connect(self.set_custom_horizon)
         toolbar.rso_table.rso_table.connect(self.open_rso_table)
+        toolbar.orbit_display.mode_changed.connect(self.set_orbit)
+        toolbar.sim_speed.mode_changed.connect(self.set_sim_speed)
 
         orbit_viewer = rendering.orbits.OrbitRenderer(self.sim)
         gt_viewer = rendering.GroundtrackRenderer()
         tabs.addTab(orbit_viewer, "Orbit")
         tabs.addTab(gt_viewer, "Groundtrack")
 
-        dock = PySide6.QtWidgets.QDockWidget("Inspector", self)
-        dock.setWidget(PySide6.QtWidgets.QLabel("Satellite info here"))
+        dock = PySide6.QtWidgets.QDockWidget("RSO Properties", self)
+        dock.setWidget(PySide6.QtWidgets.QLabel("RSO info here"))
         self.addDockWidget(PySide6.QtCore.Qt.RightDockWidgetArea, dock)
 
         status = self.statusBar()
@@ -51,11 +55,29 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
     @PySide6.QtCore.Slot(str)
     def set_horizon(self, signal):
-        self.elements["orbit"].display_mode = signal
+        self.elements["orbit"].horizon_display_mode = signal
+
+    @PySide6.QtCore.Slot(str)
+    def set_orbit(self, signal):
+        self.elements["orbit"].orbit_display_mode = signal
 
     @PySide6.QtCore.Slot(float)
     def set_custom_horizon(self, signal):
         self.elements["orbit"].custom_horizon = signal
+
+    @PySide6.QtCore.Slot(float)
+    def set_sim_speed(self, signal):
+        match signal:
+            case "1x":
+                self.sim.speed_factor = 1
+            case "10x":
+                self.sim.speed_factor = 10
+            case "100x":
+                self.sim.speed_factor = 100
+            case "1000x":
+                self.sim.speed_factor = 1000
+            case "10000x":
+                self.sim.speed_factor = 10000
 
     def open_rso_table(self):
         dialog = PySide6.QtWidgets.QDialog(self)
@@ -156,8 +178,12 @@ class SimManager:
 
     def run(self):
         app = PySide6.QtWidgets.QApplication(sys.argv)
+
+        icon_path = importlib.resources.files("hohmannpy.resources").joinpath("gfx/app_icon.png")
+        app.setWindowIcon(PySide6.QtGui.QIcon(str(icon_path)))
+
         self.gui = MainWindow(self)
         self.gui.show()
 
-        self.timer.start(16)  # ~60 FPS (16 ms)
+        self.timer.start(16)
         app.exec()
