@@ -236,9 +236,10 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
                     self.orbit_buffer[base_orbit_index + lower_index: base_orbit_index + upper_index, :] = (
                         self.positions[name][lower_index:upper_index, :]
                     )
-                    self.orbit_buffer[base_orbit_index + upper_index, :] = (
-                        self.sim.splines["positions"][name](self.sim.sim_time).astype(np.float32)
-                    )  # Add flex position.
+                    if self.horizon_display_mode == "past":  # Need flex position to prevent jitter.
+                        self.orbit_buffer[base_orbit_index + upper_index, :] = (
+                            self.sim.splines["positions"][name](self.sim.sim_time).astype(np.float32)
+                        )  # Add flex position.
                 base_orbit_index += self.positions[name].shape[0] + 2  # Move to start of next satellite's trajectory.
 
             # Update the satellite's positions using similar logic as with the orbits.
