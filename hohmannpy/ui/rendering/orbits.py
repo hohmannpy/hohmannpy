@@ -38,7 +38,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         self._scene = gfx.Scene()
 
         self._camera = gfx.PerspectiveCamera(fov=50, aspect=16/9)
-        self._camera.local.position = (15000, 0, 0)
+        self._camera.local.position = (20000, 0, 0)
         self._controller = gfx.OrbitController(
             self._camera,
             register_events=self._renderer,

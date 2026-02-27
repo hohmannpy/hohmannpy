@@ -196,7 +196,7 @@ class PlayPauseButton(PySide6.QtWidgets.QPushButton):
         self.play_icon = self.style().standardIcon(PySide6.QtWidgets.QStyle.SP_MediaPlay)
         self.pause_icon = self.style().standardIcon(PySide6.QtWidgets.QStyle.SP_MediaPause)
         self.setIcon(self.pause_icon)
-        self.setToolTip("Pause")
+        self.setToolTip("Pause <i>'SPACE'</i>")
         self.setCheckable(True)
         self.setChecked(False)
 
@@ -205,11 +205,11 @@ class PlayPauseButton(PySide6.QtWidgets.QPushButton):
     def on_click(self):
         if self.isChecked():
             self.setIcon(self.play_icon)
-            self.setToolTip("Play")
+            self.setToolTip("Play <i>'SPACE'</i>")
             self.mode_changed.emit(True)
         else:
             self.setIcon(self.pause_icon)
-            self.setToolTip("Pause")
+            self.setToolTip("Pause <i>'SPACE'</i>")
             self.mode_changed.emit(False)
 
 
@@ -221,7 +221,7 @@ class ResetButton(PySide6.QtWidgets.QPushButton):
 
         icon_path = importlib.resources.files("hohmannpy.resources").joinpath("gfx/reset_icon.png")
         self.setIcon(PySide6.QtGui.QIcon(str(icon_path)))
-        self.setToolTip("Reset")
+        self.setToolTip("Reset <i>'SHIFT + SPACE'</i>")
 
         self.clicked.connect(self.reset.emit)
 
@@ -234,7 +234,7 @@ class FocusEarthButton(PySide6.QtWidgets.QPushButton):
 
         icon_path = importlib.resources.files("hohmannpy.resources").joinpath("gfx/earth_icon.png")
         self.setIcon(PySide6.QtGui.QIcon(str(icon_path)))
-        self.setToolTip("Focus Earth")
+        self.setToolTip("Focus Earth <i>'F1'</i>")
 
         self.clicked.connect(self.focus.emit)
 
@@ -247,7 +247,7 @@ class FocusPreviousButton(PySide6.QtWidgets.QPushButton):
 
         icon = self.style().standardIcon(PySide6.QtWidgets.QStyle.SP_MediaSeekBackward)
         self.setIcon(icon)
-        self.setToolTip("Focus Previous")
+        self.setToolTip("Focus Previous <i>'['</i>")
 
         self.clicked.connect(self.focus.emit)
 
@@ -260,6 +260,6 @@ class FocusNextButton(PySide6.QtWidgets.QPushButton):
 
         icon = self.style().standardIcon(PySide6.QtWidgets.QStyle.SP_MediaSeekForward)
         self.setIcon(icon)
-        self.setToolTip("Focus Next")
+        self.setToolTip("Focus Next <i>']'</i>")
 
         self.clicked.connect(self.focus.emit)
