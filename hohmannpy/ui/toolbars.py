@@ -1,3 +1,4 @@
+import importlib.resources
 import PySide6.QtWidgets
 import PySide6.QtCore
 import PySide6.QtGui
@@ -12,13 +13,32 @@ class ToolBar(PySide6.QtWidgets.QToolBar):
         self.orbit_display = OrbitDisplayModeButton()
         self.sim_speed = SimSpeedButton()
         self.play_pause = PlayPauseButton()
+        self.reset = ResetButton()
+        self.focus_previous = FocusPreviousButton()
+        self.focus_next = FocusNextButton()
+        self.focus_earth = FocusEarthButton()
 
-        # Add buttons to toolbar.
+        spacer = PySide6.QtWidgets.QWidget()
+        spacer.setSizePolicy(
+            PySide6.QtWidgets.QSizePolicy.Expanding,
+            PySide6.QtWidgets.QSizePolicy.Preferred
+        )
+
+        # LHS, buttons are added left to right in the order in which they appear.
         self.addWidget(self.rso_table)
         self.addWidget(self.sim_speed)
         self.addWidget(self.horizon_display)
         self.addWidget(self.orbit_display)
+
+        # RHS.
+        self.addWidget(spacer)
+
+        self.addWidget(self.focus_previous)
+        self.addWidget(self.focus_earth)
+        self.addWidget(self.focus_next)
         self.addWidget(self.play_pause)
+        self.addWidget(self.reset)
+
 
 class RSOTableButton(PySide6.QtWidgets.QToolButton):
     rso_table = PySide6.QtCore.Signal()
@@ -29,6 +49,7 @@ class RSOTableButton(PySide6.QtWidgets.QToolButton):
         self.clicked.connect(self.rso_table.emit)
 
 
+# TODO: Add an option to display one orbital period.
 class HorizonDisplayModeButton(PySide6.QtWidgets.QToolButton):
     mode_changed = PySide6.QtCore.Signal(str)
     custom_horizon = PySide6.QtCore.Signal(float)
@@ -135,12 +156,14 @@ class SimSpeedButton(PySide6.QtWidgets.QToolButton):
         speed3_option = PySide6.QtGui.QAction("100x", self, checkable=True)
         speed4_option = PySide6.QtGui.QAction("1000x", self, checkable=True)
         speed5_option = PySide6.QtGui.QAction("10000x", self, checkable=True)
+        speed6_option = PySide6.QtGui.QAction("100000x", self, checkable=True)
 
         speed1_option.triggered.connect(lambda: self.mode_changed.emit("1x"))
         speed2_option.triggered.connect(lambda: self.mode_changed.emit("10x"))
         speed3_option.triggered.connect(lambda: self.mode_changed.emit("100x"))
         speed4_option.triggered.connect(lambda: self.mode_changed.emit("1000x"))
         speed5_option.triggered.connect(lambda: self.mode_changed.emit("10000x"))
+        speed6_option.triggered.connect(lambda: self.mode_changed.emit("100000x"))
 
         options = PySide6.QtGui.QActionGroup(self)
         options.setExclusive(True)
@@ -149,6 +172,7 @@ class SimSpeedButton(PySide6.QtWidgets.QToolButton):
         options.addAction(speed3_option)
         options.addAction(speed4_option)
         options.addAction(speed5_option)
+        options.addAction(speed6_option)
 
         menu = PySide6.QtWidgets.QMenu(self)
         menu.addAction(speed1_option)
@@ -156,6 +180,7 @@ class SimSpeedButton(PySide6.QtWidgets.QToolButton):
         menu.addAction(speed3_option)
         menu.addAction(speed4_option)
         menu.addAction(speed5_option)
+        menu.addAction(speed6_option)
         speed3_option.setChecked(True)
 
         self.setMenu(menu)
@@ -163,7 +188,7 @@ class SimSpeedButton(PySide6.QtWidgets.QToolButton):
 
 
 class PlayPauseButton(PySide6.QtWidgets.QPushButton):
-    mode_changed = PySide6.QtCore.Signal(str)
+    mode_changed = PySide6.QtCore.Signal(bool)
 
     def __init__(self):
         super().__init__()
@@ -171,12 +196,70 @@ class PlayPauseButton(PySide6.QtWidgets.QPushButton):
         self.play_icon = self.style().standardIcon(PySide6.QtWidgets.QStyle.SP_MediaPlay)
         self.pause_icon = self.style().standardIcon(PySide6.QtWidgets.QStyle.SP_MediaPause)
         self.setIcon(self.pause_icon)
+        self.setToolTip("Pause")
         self.setCheckable(True)
-        self.setChecked(True)
+        self.setChecked(False)
+
+        self.clicked.connect(self.on_click)
+
+    def on_click(self):
+        if self.isChecked():
+            self.setIcon(self.play_icon)
+            self.setToolTip("Play")
+            self.mode_changed.emit(True)
+        else:
+            self.setIcon(self.pause_icon)
+            self.setToolTip("Pause")
+            self.mode_changed.emit(False)
 
 
-class ResetButton(PySide6.QtWidgets.QToolButton):
-    reset = PySide6.QtCore.Signal(str)
+class ResetButton(PySide6.QtWidgets.QPushButton):
+    reset = PySide6.QtCore.Signal()
 
     def __init__(self):
         super().__init__()
+
+        icon_path = importlib.resources.files("hohmannpy.resources").joinpath("gfx/reset_icon.png")
+        self.setIcon(PySide6.QtGui.QIcon(str(icon_path)))
+        self.setToolTip("Reset")
+
+        self.clicked.connect(self.reset.emit)
+
+
+class FocusEarthButton(PySide6.QtWidgets.QPushButton):
+    focus = PySide6.QtCore.Signal()
+
+    def __init__(self):
+        super().__init__()
+
+        icon_path = importlib.resources.files("hohmannpy.resources").joinpath("gfx/earth_icon.png")
+        self.setIcon(PySide6.QtGui.QIcon(str(icon_path)))
+        self.setToolTip("Focus Earth")
+
+        self.clicked.connect(self.focus.emit)
+
+
+class FocusPreviousButton(PySide6.QtWidgets.QPushButton):
+    focus = PySide6.QtCore.Signal()
+
+    def __init__(self):
+        super().__init__()
+
+        icon = self.style().standardIcon(PySide6.QtWidgets.QStyle.SP_MediaSeekBackward)
+        self.setIcon(icon)
+        self.setToolTip("Focus Previous")
+
+        self.clicked.connect(self.focus.emit)
+
+
+class FocusNextButton(PySide6.QtWidgets.QPushButton):
+    focus = PySide6.QtCore.Signal()
+
+    def __init__(self):
+        super().__init__()
+
+        icon = self.style().standardIcon(PySide6.QtWidgets.QStyle.SP_MediaSeekForward)
+        self.setIcon(icon)
+        self.setToolTip("Focus Next")
+
+        self.clicked.connect(self.focus.emit)

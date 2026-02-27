@@ -3,19 +3,23 @@ from typing import TYPE_CHECKING
 
 import imageio.v3 as iio
 import PySide6.QtWidgets
+import PySide6.QtCore
+import PySide6.QtGui
 import rendercanvas.qt
 import pygfx as gfx
 import numpy as np
 import pylinalg as la
 
 if TYPE_CHECKING:
-    from . import application
+    from .. import application
 
 
 class OrbitRenderer(PySide6.QtWidgets.QWidget):
     """
     TBD
     """
+
+    space_pressed = PySide6.QtCore.Signal()
 
     def __init__(self, sim):
         super().__init__()
@@ -120,7 +124,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         position_chunks = []
         color_chunks = []  # Need to store colors point-wise so the single Line can have multiple colors.
 
-        position_buffer_break = np.array([[np.nan, np.nan, np.nan]], dtype=np.float32)
+        position_buffer_break = np.array([[np.nan, np.nan, np.nan], [np.nan, np.nan, np.nan]], dtype=np.float32)
         color_buffer_break = np.array([[0, 0, 0, 0]], dtype=np.float32)
 
         # For each satellite, generate the dense trajectory from the spline and then create the corresponding
@@ -130,7 +134,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
             self.positions[name] = self.positions[name].astype(np.float32)  # Data type needed by gfx.Geometry.
 
             color = np.array(gfx.Color(satellite.color), dtype=np.float32)
-            color = np.tile(color, (len(self.positions[name]), 1))
+            color = np.tile(color, (len(self.positions[name]) + 1, 1))  # +1 to account for flex positions.
 
             position_chunks.append(np.vstack([self.positions[name], position_buffer_break]))
             color_chunks.append(np.vstack([color, color_buffer_break]))
@@ -191,6 +195,9 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         # numpy array. For each satellite (although in this case we use only their trajectory via this classes'
         # position attribute) we determine which indices range corresponds to the current horizon flag. In the
         # orbit_buffer we then only set these indices to their actual position values and leave the rest as NaN.
+        #   Each chunk also has an extra buffer row added in for a "flex position". This allows the insertion of an
+        # extra dynamically-computed vertex computed every frame by calling the position spline. This way the orbit
+        # exactly matches up the with the RSO when the horizon is set to "past" and doesn't jitter.
         #   Satellites are updated using similar logic.
         base_orbit_index = 0  # Where vertically in the buffer we are.
         base_satellite_index = 0
@@ -229,7 +236,10 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
                     self.orbit_buffer[base_orbit_index + lower_index: base_orbit_index + upper_index, :] = (
                         self.positions[name][lower_index:upper_index, :]
                     )
-                base_orbit_index += self.positions[name].shape[0] + 1  # Move to start of next satellite's trajectory.
+                    self.orbit_buffer[base_orbit_index + upper_index, :] = (
+                        self.sim.splines["positions"][name](self.sim.sim_time).astype(np.float32)
+                    )  # Add flex position.
+                base_orbit_index += self.positions[name].shape[0] + 2  # Move to start of next satellite's trajectory.
 
             # Update the satellite's positions using similar logic as with the orbits.
             if self.orbit_display_mode != "traj":
@@ -247,8 +257,18 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
             self.satellite_buffer
         )
 
+        # Standard rendering code, also orients the camera. If the camera is supposed to be orbiting the Earth we just
+        # have it orbit (0, 0, 0). However, if it is orbiting a satellite we instead shift the entire pygfx.Scene (as
+        # the  scene is itself an object located in the frame of pygfx.Canvas) so that that object lives at (0, 0, 0).
+        # This is done because the logic of pygfx.OrbitController breaks when trying to follow a moving target.
+        if self.sim.focus is None:
+            target = np.array([0, 0, 0])
+        else:
+            target = self.sim.splines["positions"][self.sim.focus](self.sim.sim_time)
 
-        # Standard rendering code, also orients the camera.
-        self._renderer.render(self._scene, self._camera)
+        # Must update before render() call.
+        self._scene.local.position = tuple(-target)
         self._camera.show_pos((0, 0, 0), up=(0, 0, 1))
+
+        self._renderer.render(self._scene, self._camera)
         self._canvas.request_draw(self.animate)  # Recursive call to start rendering loop.

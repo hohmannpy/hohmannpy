@@ -8,8 +8,8 @@ import PySide6.QtGui
 import scipy as sp
 import numpy as np
 
-from . import rendering, toolbars
-from ..astro import logging, conversions
+from . import rendering, toolbars, dockers
+from ..astro import conversions
 
 
 class MainWindow(PySide6.QtWidgets.QMainWindow):
@@ -22,23 +22,28 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         tabs = PySide6.QtWidgets.QTabWidget()
         self.setCentralWidget(tabs)
 
-        toolbar = toolbars.ToolBar()
-        self.addToolBar(toolbar)
-        toolbar.setMovable(False)
-        toolbar.setFloatable(False)
-        toolbar.horizon_display.mode_changed.connect(self.set_horizon)
-        toolbar.horizon_display.custom_horizon.connect(self.set_custom_horizon)
-        toolbar.rso_table.rso_table.connect(self.open_rso_table)
-        toolbar.orbit_display.mode_changed.connect(self.set_orbit)
-        toolbar.sim_speed.mode_changed.connect(self.set_sim_speed)
+        self.toolbar = toolbars.ToolBar()
+        self.addToolBar(self.toolbar)
+        self.toolbar.setMovable(False)
+        self.toolbar.setFloatable(False)
+        self.toolbar.horizon_display.mode_changed.connect(self.set_horizon)
+        self.toolbar.horizon_display.custom_horizon.connect(self.set_custom_horizon)
+        self.toolbar.rso_table.rso_table.connect(self.open_rso_table)
+        self.toolbar.orbit_display.mode_changed.connect(self.set_orbit)
+        self.toolbar.sim_speed.mode_changed.connect(self.set_sim_speed)
+        self.toolbar.play_pause.mode_changed.connect(self.set_play_pause)
+        self.toolbar.reset.reset.connect(self.reset_sim)
+        self.toolbar.focus_previous.focus.connect(self.set_focus_previous)
+        self.toolbar.focus_earth.focus.connect(self.set_focus_earth)
+        self.toolbar.focus_next.focus.connect(self.set_focus_next)
 
         orbit_viewer = rendering.orbits.OrbitRenderer(self.sim)
         gt_viewer = rendering.GroundtrackRenderer()
         tabs.addTab(orbit_viewer, "Orbit")
         tabs.addTab(gt_viewer, "Groundtrack")
+        orbit_viewer.space_pressed.connect(self.on_space_press)
 
-        dock = PySide6.QtWidgets.QDockWidget("RSO Properties", self)
-        dock.setWidget(PySide6.QtWidgets.QLabel("RSO info here"))
+        dock = dockers.PropertiesDocker(self.sim)
         self.addDockWidget(PySide6.QtCore.Qt.RightDockWidgetArea, dock)
 
         status = self.statusBar()
@@ -48,11 +53,18 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.elements = {
             "orbit" : orbit_viewer,
             "groundtrack" : gt_viewer,
-            "toolbar" : toolbar,
+            "toolbar" : self.toolbar,
             "tabs" : tabs,
             "dock" : dock,
             "status" : status,
         }
+
+        # Some additional qt stuff for key press handling.
+        self.shortcuts = {}
+        self.shortcuts["space"] = PySide6.QtGui.QShortcut(PySide6.QtGui.QKeySequence(PySide6.QtCore.Qt.Key_Space), self)
+        self.shortcuts["space"].setContext(PySide6.QtCore.Qt.WidgetWithChildrenShortcut)
+        self.shortcuts["space"].activated.connect(self.on_space_press)
+
 
     @PySide6.QtCore.Slot(str)
     def set_horizon(self, signal):
@@ -79,10 +91,67 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
                 self.sim.speed_factor = 1000
             case "10000x":
                 self.sim.speed_factor = 10000
+            case "100000x":
+                self.sim.speed_factor = 100000
+
+    @PySide6.QtCore.Slot(bool)
+    def set_play_pause(self, signal):
+        if signal:
+            self.sim.old_speed_factor = self.sim.speed_factor
+            self.sim.speed_factor = 0
+        else:
+            self.sim.speed_factor = self.sim.old_speed_factor
 
     def open_rso_table(self):
         table = RSOTable(self.sim)
         table.show()
+
+    def reset_sim(self):
+        self.sim.initial_local_time = time.perf_counter()
+        self.sim.sim_time = 0
+
+    def set_focus_previous(self):
+        names = list(self.sim.satellites.keys())
+
+        if self.sim.focus is None:
+            self.sim.focus = names[-1]
+        else:
+            index = names.index(self.sim.focus)
+            if index == 0:
+                self.sim.focus = None
+            else:
+                self.sim.focus = names[index - 1]
+
+        print(self.sim.focus)
+
+    def set_focus_earth(self):
+        self.sim.focus = None
+
+    def set_focus_next(self):
+        names = list(self.sim.satellites.keys())
+
+        if self.sim.focus is None:
+            self.sim.focus = names[0]
+        else:
+            index = names.index(self.sim.focus)
+            if index == len(names) - 1:
+                self.sim.focus = None
+            else:
+                self.sim.focus = names[index + 1]
+
+    def on_space_press(self):
+        focus = PySide6.QtWidgets.QApplication.focusWidget()  # Ignore input if a window with typing is enabled.
+        if isinstance(focus, (
+                PySide6.QtWidgets.QLineEdit,
+                PySide6.QtWidgets.QTextEdit,
+                PySide6.QtWidgets.QPlainTextEdit,
+                PySide6.QtWidgets.QSpinBox,
+                PySide6.QtWidgets.QDoubleSpinBox,
+        )):
+            return
+
+        self.toolbar.play_pause.setChecked(not self.toolbar.play_pause.isChecked())
+        self.toolbar.play_pause.on_click()
 
 
 class RSOTable(PySide6.QtWidgets.QDialog):
@@ -205,7 +274,7 @@ class RSOTable(PySide6.QtWidgets.QDialog):
             bottom_index = self.table.rowCount() - 1
 
         items = list(self.sim.satellites.items())
-        for i in range(top_index, bottom_index):
+        for i in range(top_index, bottom_index + 1):
             name = items[i][0]
             satellite = items[i][1]
 
@@ -240,7 +309,9 @@ class SimManager:
         self.sim_time = 0
         self.final_sim_time = (final_global_time.julian_date - initial_global_time.julian_date) * 86400
         self.speed_factor = 100
+        self.old_speed_factor = self.speed_factor
         self.satellite_display_flags = {name: True for name in self.satellites.keys()}
+        self.focus = None
 
         self.splines = {"positions" : {}, "velocities" : {}}
 
