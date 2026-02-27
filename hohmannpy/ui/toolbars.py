@@ -4,6 +4,7 @@ import PySide6.QtCore
 import PySide6.QtGui
 
 
+# TODO: Documentation.
 class ToolBar(PySide6.QtWidgets.QToolBar):
     def __init__(self):
         super().__init__()
@@ -49,7 +50,6 @@ class RSOTableButton(PySide6.QtWidgets.QToolButton):
         self.clicked.connect(self.rso_table.emit)
 
 
-# TODO: Add an option to display one orbital period.
 class HorizonDisplayModeButton(PySide6.QtWidgets.QToolButton):
     mode_changed = PySide6.QtCore.Signal(str)
     custom_horizon = PySide6.QtCore.Signal(float)
@@ -59,6 +59,7 @@ class HorizonDisplayModeButton(PySide6.QtWidgets.QToolButton):
 
         self.setText("Horizon")
 
+        period_option = PySide6.QtGui.QAction("Period", self, checkable=True)
         full_option = PySide6.QtGui.QAction("Full", self, checkable=True)
         past_option = PySide6.QtGui.QAction("Past", self, checkable=True)
         hour_option = PySide6.QtGui.QAction("1-Hour", self, checkable=True)
@@ -66,6 +67,7 @@ class HorizonDisplayModeButton(PySide6.QtWidgets.QToolButton):
         day_option = PySide6.QtGui.QAction("24-Hour", self, checkable=True)
         custom_option = PySide6.QtGui.QAction("Custom...", self, checkable=True)
 
+        period_option.triggered.connect(lambda: self.mode_changed.emit("period"))
         full_option.triggered.connect(lambda: self.mode_changed.emit("full"))
         past_option.triggered.connect(lambda: self.mode_changed.emit("past"))
         hour_option.triggered.connect(lambda: self.mode_changed.emit("hour"))
@@ -75,22 +77,24 @@ class HorizonDisplayModeButton(PySide6.QtWidgets.QToolButton):
 
         options = PySide6.QtGui.QActionGroup(self)
         options.setExclusive(True)
-        options.addAction(full_option)
+        options.addAction(period_option)
         options.addAction(past_option)
+        options.addAction(full_option)
         options.addAction(hour_option)
         options.addAction(half_day_option)
         options.addAction(day_option)
         options.addAction(custom_option)
 
         menu = PySide6.QtWidgets.QMenu(self)
-        menu.addAction(full_option)
+        menu.addAction(period_option)
         menu.addAction(past_option)
+        menu.addAction(full_option)
         menu.addAction(hour_option)
         menu.addAction(half_day_option)
         menu.addAction(day_option)
         menu.addSeparator()
         menu.addAction(custom_option)
-        full_option.setChecked(True)
+        period_option.setChecked(True)
 
         self.setMenu(menu)
         self.setPopupMode(PySide6.QtWidgets.QToolButton.InstantPopup)

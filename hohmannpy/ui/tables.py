@@ -5,6 +5,7 @@ import PySide6.QtGui
 
 from ..astro import conversions
 
+# TODO: Documentation.
 class RSOTable(PySide6.QtWidgets.QDialog):
     """
     Table which holds information on all the RSOs in the sim.

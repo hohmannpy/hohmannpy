@@ -11,6 +11,10 @@ import numpy as np
 from . import rendering, toolbars, dockers, tables
 
 
+# TODO:
+#   - Hovering over satellite displays name, clicking focuses it.
+#   - Document these classes.
+#   - Option to enable docker after closing it.
 class MainWindow(PySide6.QtWidgets.QMainWindow):
     def __init__(self, sim):
         super().__init__()
@@ -40,6 +44,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         gt_viewer = rendering.GroundtrackRenderer()
         tabs.addTab(orbit_viewer, "Orbit")
         tabs.addTab(gt_viewer, "Groundtrack")
+        tabs.addTab(PySide6.QtWidgets.QWidget(), "Data Visualizer")
         orbit_viewer.space_pressed.connect(self.on_space_press)
 
         dock = dockers.PropertiesDocker(self.sim)
@@ -134,6 +139,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
     def reset_sim(self):
         self.sim.initial_local_time = time.perf_counter()
         self.sim.sim_time = 0
+        self.statusBar().showMessage("Resetting mission...", 3000)
 
     def set_focus_previous(self):
         names = list(self.sim.satellites.keys())
@@ -289,6 +295,7 @@ class SimManager:
         if self.sim_time > self.final_sim_time:
             self.initial_local_time = time.perf_counter()
             self.sim_time = 0
+            self.gui.statusBar().showMessage("End of mission reached, resetting...", 3000)
 
     def frame_update(self):
         self.sim_clock()

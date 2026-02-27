@@ -7,6 +7,10 @@ from ..astro import conversions
 
 
 class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
+    """
+    Docker which displays the state and classical elements of the selected RSO.
+    """
+
     def __init__(self, sim):
         super().__init__()
 
@@ -14,13 +18,15 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
 
         self.setWindowTitle("RSO Properties")
 
+        # Docket consists of a QWidget holding a QVBoxLayout which holds a series of headers and QFormLayouts to display
+        # data.
         container = PySide6.QtWidgets.QWidget()
         self.setWidget(container)
 
         layout = PySide6.QtWidgets.QVBoxLayout(container)
         layout.setAlignment(PySide6.QtCore.Qt.AlignTop)
 
-        self.labels = {}
+        self.labels = {}  # All data labels.
         self.labels["name"] = PySide6.QtWidgets.QLabel("No RSO Selected")
         self.labels["name"].setAlignment(PySide6.QtCore.Qt.AlignCenter)
         self.labels["name"].setStyleSheet("font-weight: bold;")
@@ -31,6 +37,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
         self.labels["classical_elements"].setAlignment(PySide6.QtCore.Qt.AlignCenter)
         self.labels["classical_elements"].setStyleSheet("font-weight: 300;")
 
+        # Setup ECI state display.
         state_form = PySide6.QtWidgets.QFormLayout(container)
         self.state_values = {
             "x_position": ["Position (km) :", PySide6.QtWidgets.QLabel("—")],
@@ -44,6 +51,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
             value[1].setAlignment(PySide6.QtCore.Qt.AlignRight)
             state_form.addRow(value[0], value[1])
 
+        # Setup classical orbital elements display.
         ce_form = PySide6.QtWidgets.QFormLayout(container)
         self.ce_values = {
             "sm_axis" : ["Semijax (km)", PySide6.QtWidgets.QLabel("—")],
@@ -57,6 +65,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
             value[1].setAlignment(PySide6.QtCore.Qt.AlignRight)
             ce_form.addRow(value[0] + ":", value[1])
 
+        # Order widgets are added determines how they appear top to bottom.
         layout.addWidget(self.labels["name"])
         layout.addWidget(self.labels["state"])
         layout.addLayout(state_form)
@@ -69,6 +78,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
         self.timer.start(250)
 
     def frame_update(self):
+        # If no RSO is focus leave all values blank, otherwise compute them from the focused RSO's trajectory splines.
         if self.sim.focus is not None:
             position = self.sim.splines["positions"][self.sim.focus](self.sim.sim_time) * 1000
             velocity = self.sim.splines["velocities"][self.sim.focus](self.sim.sim_time) * 1000

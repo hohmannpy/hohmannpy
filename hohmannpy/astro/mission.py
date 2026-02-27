@@ -10,6 +10,9 @@ from . import propagation, perturbations, time, logging, spacecraft
 from ..ui import application
 
 
+# TODO:
+#   - Print propagation updates.
+#   - Option to pickle mission class.
 class Mission:
     r"""
     Master class for all orbital simulations.

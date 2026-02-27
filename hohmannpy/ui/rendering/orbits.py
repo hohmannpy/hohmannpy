@@ -14,9 +14,12 @@ if TYPE_CHECKING:
     from .. import application
 
 
+# TODO:
+#   - Add built in ECI basis in bottom right.
+#   - Visible Sun for scene.
 class OrbitRenderer(PySide6.QtWidgets.QWidget):
     """
-    TBD
+    Render engine for the orbital scene.
     """
 
     space_pressed = PySide6.QtCore.Signal()
@@ -25,7 +28,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         super().__init__()
 
         self.orbit_display_mode: str = "both"
-        self.horizon_display_mode: str = "full"
+        self.horizon_display_mode: str = "period"
         self.custom_horizon: int = 24 * 3600  # Defaults to one day.
         self.sim: application.SimManager = sim
         self.objects : dict[str, gfx.WorldObject] = {}
@@ -176,7 +179,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
 
     def animate(self):
         """
-        TBD
+        One frame of the animation loop.
         """
 
         earth_rot = 7.292115e-5  # Mean rotation rate of the Earth in rad/s.
@@ -212,6 +215,19 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
                         case "none":
                             lower_index = 0
                             upper_index = 0
+                        case "period":
+                            position = self.sim.splines["positions"][name](self.sim.sim_time) * 1000
+                            velocity = self.sim.splines["velocities"][name](self.sim.sim_time) * 1000
+                            grav_param = self.sim.satellites[name].orbit.grav_param
+
+                            sm_axis = -grav_param / (
+                                np.linalg.norm(velocity) ** 2 / 2 - grav_param / np.linalg.norm(position)) / 2
+                            if sm_axis < 0:
+                                sm_axis *= -1
+                            period = 2 * np.pi * np.sqrt(sm_axis ** 3 / grav_param)
+
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - period)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + period)
                         case "full":
                             lower_index = 0
                             upper_index = len(self.dense_times)
@@ -219,14 +235,14 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
                             lower_index = 0
                             upper_index = np.searchsorted(self.dense_times, self.sim.sim_time)
                         case "hour":
-                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 30)
-                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 30)
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60)
                         case "half_day":
-                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60 * 6)
-                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60 * 6)
-                        case "day":
                             lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60 * 12)
                             upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60 * 12)
+                        case "day":
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60 * 24)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60 * 24)
                         case "custom":
                             lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - self.custom_horizon)
                             upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + self.custom_horizon)
