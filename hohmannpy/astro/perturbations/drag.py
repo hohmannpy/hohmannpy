@@ -22,8 +22,6 @@ class AtmosphericDrag(base.Perturbation):
 
     Parameters
     ----------
-    initial_gmst : float
-        Current angle of the Greenwich meridian in radians.
     solar_activity : str
         Which CIRA-12 reference atmosphere model to use for the density. Can select between "low", "medium", and "high".
         See the CIRA-12 offical report [1]_ for more details on how to select between these.
@@ -67,13 +65,12 @@ class AtmosphericDrag(base.Perturbation):
 
     def __init__(
             self,
-            initial_gmst: float,
             solar_activity: str = "moderate",
             solver_tol: float = 1e-8
     ):
         super().__init__()
 
-        self.initial_gmst = initial_gmst
+        self.initial_gmst = None
         self.solver_tol = solver_tol
 
         # Import the density table to use based on the chosen solar and geomagnetic activity level.
@@ -105,6 +102,21 @@ class AtmosphericDrag(base.Perturbation):
             raise ValueError(f"{solar_activity} is not a valid setting for the solar activity, please choose from "
                              f"'low', 'medium', or 'high'.")
         self.exosphere_bound = density_curve[-1, 0]
+
+    def finalize__init__(self, initial_gmst: float):
+        """
+        Record the initial GMST of the Earth which is used to correctly orient it for geopotential modeling.
+
+        This is needed by :meth:`evaluate()` but can't be passed to the base ``__init__()``. This is called during
+        :class:`~hohmannpy.astro.Mission`'s instantiation.
+
+        Parameters
+        ----------
+        initial_gmst : float
+            Initial angle of the Greenwich meridian in :math:`rad`.
+        """
+
+        self.initial_gmst = initial_gmst
 
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""

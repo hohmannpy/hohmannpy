@@ -41,7 +41,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.toolbar.focus_next.focus.connect(self.set_focus_next)
 
         orbit_viewer = rendering.orbits.OrbitRenderer(self.sim)
-        gt_viewer = rendering.GroundtrackRenderer()
+        gt_viewer = rendering.GroundtrackRenderer(self.sim)
         tabs.addTab(orbit_viewer, "Orbit")
         tabs.addTab(gt_viewer, "Groundtrack")
         tabs.addTab(PySide6.QtWidgets.QWidget(), "Data Visualizer")
@@ -252,6 +252,7 @@ class SimManager:
         self.local_time = time.perf_counter()
         self.initial_local_time = self.local_time
         self.sim_time = 0
+        self.initial_global_time = initial_global_time
         self.final_sim_time = (final_global_time.julian_date - initial_global_time.julian_date) * 86400
         self.speed_factor = 100
         self.old_speed_factor = self.speed_factor
@@ -262,9 +263,9 @@ class SimManager:
 
         for name, satellite in self.satellites.items():
             times = satellite.time_history
-            for i in range(1, len(times)):
-                if times[i] <= times[i - 1]:
-                    times[i] = times[i - 1] + 1e-9
+            for i in range(1, times.shape[1]):
+                if times[0, i] <= times[0, i - 1]:
+                    times[0, i] = times[0, i - 1] + 1e-9
             positions = satellite.position_history.T / 1000
             velocities = satellite.velocity_history.T / 1000
 

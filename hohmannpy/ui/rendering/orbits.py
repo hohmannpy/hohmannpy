@@ -137,10 +137,10 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
             self.positions[name] = self.positions[name].astype(np.float32)  # Data type needed by gfx.Geometry.
 
             color = np.array(gfx.Color(satellite.color), dtype=np.float32)
-            color = np.tile(color, (len(self.positions[name]) + 1, 1))  # +1 to account for flex positions.
+            color_chunk = np.tile(color, (len(self.positions[name]) + 1, 1))  # +1 to account for flex positions.
 
             position_chunks.append(np.vstack([self.positions[name], position_buffer_break]))
-            color_chunks.append(np.vstack([color, color_buffer_break]))
+            color_chunks.append(np.vstack([color_chunk, color_buffer_break]))
 
         # Create the full buffer and then line object from the chunk lists. We store the buffer here because it is
         # needed later for dynamic horizon updates.

@@ -172,6 +172,8 @@ class Mission:
                     perturbation.finalize__init__(self.initial_global_time.gmst)
                 if isinstance(perturbation, perturbations.J2):
                     perturbation.finalize__init__(self.initial_global_time.gmst)
+                if isinstance(perturbation, perturbations.AtmosphericDrag):
+                    perturbation.finalize__init__(self.initial_global_time.gmst)
                 if isinstance(perturbation, perturbations.ThirdBodyGravity):
                     perturbation.finalize__init__(self.initial_global_time, self.final_global_time)
 
