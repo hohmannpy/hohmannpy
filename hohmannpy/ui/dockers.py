@@ -84,12 +84,12 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
             velocity = self.sim.splines["velocities"][self.sim.focus](self.sim.sim_time) * 1000
             grav_param = self.sim.satellites[self.sim.focus].orbit.grav_param
 
-            self.state_values["x_position"][1].setText(f"{position[0]:.3f}")
-            self.state_values["y_position"][1].setText(f"{position[1]:.3f}")
-            self.state_values["z_position"][1].setText(f"{position[2]:.3f}")
-            self.state_values["x_velocity"][1].setText(f"{velocity[0]:.3f}")
-            self.state_values["y_velocity"][1].setText(f"{velocity[1]:.3f}")
-            self.state_values["z_velocity"][1].setText(f"{velocity[2]:.3f}")
+            self.state_values["x_position"][1].setText(f"{position[0] / 1000:.3f}")
+            self.state_values["y_position"][1].setText(f"{position[1] / 1000:.3f}")
+            self.state_values["z_position"][1].setText(f"{position[2] / 1000:.3f}")
+            self.state_values["x_velocity"][1].setText(f"{velocity[0] / 1000:.3f}")
+            self.state_values["y_velocity"][1].setText(f"{velocity[1] / 1000:.3f}")
+            self.state_values["z_velocity"][1].setText(f"{velocity[2] / 1000:.3f}")
 
             sm_axis, eccentricity, raan, inclination, argp, true_anomaly = (
                 conversions.state_2_classical(position, velocity, grav_param)

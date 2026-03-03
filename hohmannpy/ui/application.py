@@ -15,6 +15,8 @@ from . import rendering, toolbars, dockers, tables
 #   - Hovering over satellite displays name, clicking focuses it.
 #   - Document these classes.
 #   - Option to enable docker after closing it.
+#   - Pause rendering of non-visible tabs.
+#   - FPS tracker.
 class MainWindow(PySide6.QtWidgets.QMainWindow):
     def __init__(self, sim):
         super().__init__()
@@ -25,23 +27,23 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         tabs = PySide6.QtWidgets.QTabWidget()
         self.setCentralWidget(tabs)
 
-        self.toolbar = toolbars.ToolBar()
-        self.addToolBar(self.toolbar)
-        self.toolbar.setMovable(False)
-        self.toolbar.setFloatable(False)
-        self.toolbar.horizon_display.mode_changed.connect(self.set_horizon)
-        self.toolbar.horizon_display.custom_horizon.connect(self.set_custom_horizon)
-        self.toolbar.rso_table.rso_table.connect(self.open_rso_table)
-        self.toolbar.orbit_display.mode_changed.connect(self.set_orbit)
-        self.toolbar.sim_speed.mode_changed.connect(self.set_sim_speed)
-        self.toolbar.play_pause.mode_changed.connect(self.set_play_pause)
-        self.toolbar.reset.reset.connect(self.reset_sim)
-        self.toolbar.focus_previous.focus.connect(self.set_focus_previous)
-        self.toolbar.focus_earth.focus.connect(self.set_focus_earth)
-        self.toolbar.focus_next.focus.connect(self.set_focus_next)
+        toolbar = toolbars.ToolBar()
+        self.addToolBar(toolbar)
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        toolbar.horizon_display.mode_changed.connect(self.set_horizon)
+        toolbar.horizon_display.custom_horizon.connect(self.set_custom_horizon)
+        toolbar.rso_table.rso_table.connect(self.open_rso_table)
+        toolbar.orbit_display.mode_changed.connect(self.set_orbit)
+        toolbar.sim_speed.mode_changed.connect(self.set_sim_speed)
+        toolbar.play_pause.mode_changed.connect(self.set_play_pause)
+        toolbar.reset.reset.connect(self.reset_sim)
+        toolbar.focus_previous.focus.connect(self.set_focus_previous)
+        toolbar.focus_earth.focus.connect(self.set_focus_earth)
+        toolbar.focus_next.focus.connect(self.set_focus_next)
 
-        orbit_viewer = rendering.orbits.OrbitRenderer(self.sim)
-        gt_viewer = rendering.GroundtrackRenderer(self.sim)
+        orbit_viewer = rendering.orbits.OrbitRenderer(self.sim, tabs)
+        gt_viewer = rendering.GroundtrackRenderer(self.sim, tabs)
         tabs.addTab(orbit_viewer, "Orbit")
         tabs.addTab(gt_viewer, "Groundtrack")
         tabs.addTab(PySide6.QtWidgets.QWidget(), "Data Visualizer")
@@ -62,7 +64,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.elements = {
             "orbit" : orbit_viewer,
             "groundtrack" : gt_viewer,
-            "toolbar" : self.toolbar,
+            "toolbar" : toolbar,
             "tabs" : tabs,
             "dock" : dock,
             "status" : status,
@@ -98,15 +100,15 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
     @PySide6.QtCore.Slot(str)
     def set_horizon(self, signal):
-        self.elements["orbit"].horizon_display_mode = signal
+        self.sim.horizon_display_mode = signal
 
     @PySide6.QtCore.Slot(str)
     def set_orbit(self, signal):
-        self.elements["orbit"].orbit_display_mode = signal
+        self.sim.orbit_display_mode = signal
 
     @PySide6.QtCore.Slot(float)
     def set_custom_horizon(self, signal):
-        self.elements["orbit"].custom_horizon = signal
+        self.sim.custom_horizon = signal
 
     @PySide6.QtCore.Slot(float)
     def set_sim_speed(self, signal):
@@ -204,8 +206,8 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
     def on_space_press(self):
         self.focus_check()
-        self.toolbar.play_pause.setChecked(not self.toolbar.play_pause.isChecked())
-        self.toolbar.play_pause.on_click()
+        self.elements["toolbar"].play_pause.setChecked(not self.elements["toolbar"].play_pause.isChecked())
+        self.elements["toolbar"].play_pause.on_click()
 
     def on_lb_press(self):
         self.focus_check()
@@ -258,6 +260,9 @@ class SimManager:
         self.old_speed_factor = self.speed_factor
         self.satellite_display_flags = {name: True for name in self.satellites.keys()}
         self.focus = None
+        self.orbit_display_mode = "both"
+        self.horizon_display_mode = "period"
+        self.custom_horizon: int = 24 * 3600  # Defaults to one day.
 
         self.splines = {"positions" : {}, "velocities" : {}}
 

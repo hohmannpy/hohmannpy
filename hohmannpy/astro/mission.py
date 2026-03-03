@@ -2,6 +2,7 @@ from __future__ import annotations
 import copy
 import concurrent.futures
 from typing import Optional
+import pickle
 
 import pandas as pd
 import numpy as np
@@ -12,7 +13,6 @@ from ..ui import application
 
 # TODO:
 #   - Print propagation updates.
-#   - Option to pickle mission class.
 class Mission:
     r"""
     Master class for all orbital simulations.
@@ -314,3 +314,18 @@ class Mission:
                 index=False,
                 float_format=f"%.{fp_accuracy}f"
             )
+
+    def save(self, id: str, target_directory: str):
+        r"""
+        Pickle the ``Mission`` so that it may be loaded later.
+
+         Parameters
+        ----------
+        id : str
+            Name of the pickled ``Mission``.
+        target_directory : str
+            The folder path to store the pickled ``Mission`` in.
+        """
+
+        with open(f"{target_directory}/{id}.pkl", "wb") as f:
+            pickle.dump(self, f)

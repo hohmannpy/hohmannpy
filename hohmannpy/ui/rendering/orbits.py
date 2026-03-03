@@ -24,14 +24,13 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
 
     space_pressed = PySide6.QtCore.Signal()
 
-    def __init__(self, sim):
+    def __init__(self, sim, tabs):
         super().__init__()
 
-        self.orbit_display_mode: str = "both"
-        self.horizon_display_mode: str = "period"
-        self.custom_horizon: int = 24 * 3600  # Defaults to one day.
         self.sim: application.SimManager = sim
+        self.initial_gmst = sim.initial_global_time.gmst
         self.objects : dict[str, gfx.WorldObject] = {}
+        self.tabs = tabs
 
         # Set up the internal pygfx rendering via a QRenderWidget. This is placed inside a normal QWidget so that UI
         # can be overlaid on the rendering. The involves the standard pygfx pipeline of canvas -> renderer -> scene ->
@@ -66,8 +65,11 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         )
         self.base_earth_rotation = la.quat_from_euler(
             (np.pi / 2, 0, 0), order="XYZ"
-        )  # Rotate Earth since texture is 90 deg offset about x-axis, then offset terminator in new body frame.
-        self.objects["earth"].local.rotation = self.base_earth_rotation
+        )
+        self.objects["earth"].local.rotation = la.quat_mul(
+            self.base_earth_rotation,
+            la.quat_from_axis_angle((0, 1, 0), self.initial_gmst),
+        ) # Rotate Earth since texture is 90 deg offset about x-axis, then offset terminator in new body frame.
         self._scene.add(self.objects["earth"])
 
         with importlib.resources.files("hohmannpy.resources").joinpath("gfx/skybox/skybox_right1.png").open("rb") as f:
@@ -97,7 +99,6 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         )
 
         self._scene.add(skybox)
-        self._canvas.request_draw(self.animate)  # Render the initial scene.
 
         # Displaying orbits is optimized (although poorly) for large satellite constellations, although individual
         # satellites can also be rendered with no issues. To do this, all orbits are rendered via a single pygfx.Line
@@ -173,7 +174,9 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         self._scene.add(self.objects["satellite_points"])
         self.satellite_buffer = satellite_buffer
 
-        # Add the pygfx render to a qt widget.
+        # Draw the finalized canvas and add it to the gui.
+        self._canvas.request_draw(self.animate)
+
         layout = PySide6.QtWidgets.QVBoxLayout(self)
         layout.addWidget(self._canvas)
 
@@ -182,13 +185,18 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         One frame of the animation loop.
         """
 
+        # Don't render if this tab isn't visible.
+        if self.tabs.currentIndex() != 0:
+            self._canvas.request_draw(self.animate)  # Buffer a recursive call to start rendering loop.
+            return
+
         earth_rot = 7.292115e-5  # Mean rotation rate of the Earth in rad/s.
 
         # Update the Earth's rotation. Note that this is a simple mean precession linear progression and doesn't contain
         # nutation.
         self.objects["earth"].local.rotation = la.quat_mul(
             self.base_earth_rotation,
-            la.quat_from_axis_angle((0, 1, 0), self.sim.sim_time * earth_rot),
+            la.quat_from_axis_angle((0, 1, 0), self.initial_gmst + self.sim.sim_time * earth_rot),
         )
 
         # This is the update loop for all of moving geometry. This includes satellites as well as orbits (since when
@@ -209,19 +217,16 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         self.satellite_buffer[:, :] = np.nan
 
         for name in self.sim.satellites.keys():
-            if self.orbit_display_mode != "rso":
+            if self.sim.orbit_display_mode != "rso":
                 if self.sim.satellite_display_flags[name]:
-                    match self.horizon_display_mode:
-                        case "none":
-                            lower_index = 0
-                            upper_index = 0
+                    match self.sim.horizon_display_mode:
                         case "period":
                             position = self.sim.splines["positions"][name](self.sim.sim_time) * 1000
                             velocity = self.sim.splines["velocities"][name](self.sim.sim_time) * 1000
                             grav_param = self.sim.satellites[name].orbit.grav_param
 
                             sm_axis = -grav_param / (
-                                np.linalg.norm(velocity) ** 2 / 2 - grav_param / np.linalg.norm(position)) / 2
+                                np.linalg.norm(velocity) ** 2 / 2 - grav_param / np.linalg.norm(position))
                             if sm_axis < 0:
                                 sm_axis *= -1
                             period = 2 * np.pi * np.sqrt(sm_axis ** 3 / grav_param)
@@ -244,22 +249,22 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
                             lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60 * 24)
                             upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60 * 24)
                         case "custom":
-                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - self.custom_horizon)
-                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + self.custom_horizon)
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - self.sim.custom_horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + self.sim.custom_horizon)
 
                     # For the portion of the orbit_buffer corresponding to this satellite's trajectory (found via
                     # base_index) set the rows between lower and upper index to their actual values.
                     self.orbit_buffer[base_orbit_index + lower_index: base_orbit_index + upper_index, :] = (
                         self.positions[name][lower_index:upper_index, :]
                     )
-                    if self.horizon_display_mode == "past":  # Need flex position to prevent jitter.
+                    if self.sim.horizon_display_mode == "past":  # Need flex position to prevent jitter.
                         self.orbit_buffer[base_orbit_index + upper_index, :] = (
                             self.sim.splines["positions"][name](self.sim.sim_time).astype(np.float32)
                         )  # Add flex position.
                 base_orbit_index += self.positions[name].shape[0] + 2  # Move to start of next satellite's trajectory.
 
             # Update the satellite's positions using similar logic as with the orbits.
-            if self.orbit_display_mode != "traj":
+            if self.sim.orbit_display_mode != "traj":
                 if self.sim.satellite_display_flags[name]:
                     self.satellite_buffer[base_satellite_index, :] = (
                         self.sim.splines["positions"][name](self.sim.sim_time).astype(np.float32)
@@ -288,4 +293,4 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         self._camera.show_pos((0, 0, 0), up=(0, 0, 1))
 
         self._renderer.render(self._scene, self._camera)
-        self._canvas.request_draw(self.animate)  # Recursive call to start rendering loop.
+        self._canvas.request_draw(self.animate)  # Buffer a recursive call to start rendering loop.
