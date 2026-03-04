@@ -4,6 +4,7 @@ import PySide6.QtCore
 import PySide6.QtGui
 
 from ..astro import conversions
+from ..dynamics import dcms
 
 
 class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
@@ -36,6 +37,9 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
         self.labels["classical_elements"] = PySide6.QtWidgets.QLabel("Classical Elements")
         self.labels["classical_elements"].setAlignment(PySide6.QtCore.Qt.AlignCenter)
         self.labels["classical_elements"].setStyleSheet("font-weight: 300;")
+        self.labels["groundtrack"] = PySide6.QtWidgets.QLabel("Groundtrack")
+        self.labels["groundtrack"].setAlignment(PySide6.QtCore.Qt.AlignCenter)
+        self.labels["groundtrack"].setStyleSheet("font-weight: 300;")
 
         # Setup ECI state display.
         state_form = PySide6.QtWidgets.QFormLayout(container)
@@ -59,11 +63,21 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
             "raan": ["RAAN (deg)", PySide6.QtWidgets.QLabel("—")],
             "argp": ["ArgP (deg)", PySide6.QtWidgets.QLabel("—")],
             "inclination": ["Inclination (deg)", PySide6.QtWidgets.QLabel("—")],
-            "true_anomaly": ["True Anomaly", PySide6.QtWidgets.QLabel("—")],
+            "true_anomaly": ["True Anomaly (deg)", PySide6.QtWidgets.QLabel("—")],
         }
         for value in self.ce_values.values():
             value[1].setAlignment(PySide6.QtCore.Qt.AlignRight)
             ce_form.addRow(value[0] + ":", value[1])
+
+        # Setup groundtrack display.
+        gt_form = PySide6.QtWidgets.QFormLayout(container)
+        self.gt_values = {
+            "longitude": ["Longitude (deg)", PySide6.QtWidgets.QLabel("—")],
+            "latitude": ["Latitude (deg)", PySide6.QtWidgets.QLabel("—")],
+        }
+        for value in self.gt_values.values():
+            value[1].setAlignment(PySide6.QtCore.Qt.AlignRight)
+            gt_form.addRow(value[0] + ":", value[1])
 
         # Order widgets are added determines how they appear top to bottom.
         layout.addWidget(self.labels["name"])
@@ -71,6 +85,8 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
         layout.addLayout(state_form)
         layout.addWidget(self.labels["classical_elements"])
         layout.addLayout(ce_form)
+        layout.addWidget(self.labels["groundtrack"])
+        layout.addLayout(gt_form)
 
         # Timer used to update table values each frame.
         self.timer = PySide6.QtCore.QTimer(self)
@@ -80,6 +96,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
     def frame_update(self):
         # If no RSO is focus leave all values blank, otherwise compute them from the focused RSO's trajectory splines.
         if self.sim.focus is not None:
+            # Update position and velocity.
             position = self.sim.splines["positions"][self.sim.focus](self.sim.sim_time) * 1000
             velocity = self.sim.splines["velocities"][self.sim.focus](self.sim.sim_time) * 1000
             grav_param = self.sim.satellites[self.sim.focus].orbit.grav_param
@@ -91,6 +108,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
             self.state_values["y_velocity"][1].setText(f"{velocity[1] / 1000:.3f}")
             self.state_values["z_velocity"][1].setText(f"{velocity[2] / 1000:.3f}")
 
+            # Update orbital elements.
             sm_axis, eccentricity, raan, inclination, argp, true_anomaly = (
                 conversions.state_2_classical(position, velocity, grav_param)
             )
@@ -103,9 +121,34 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
             self.ce_values["true_anomaly"][1].setText(f"{np.rad2deg(true_anomaly):.3f}")
 
             self.labels["name"].setText(self.sim.satellites[self.sim.focus].name)
+
+            # Update groundtrack.
+            earth_rot = 7.292115e-5  # Mean rotation rate of the Earth in rad/s.
+            earth_radius = 6378.1363e3
+            earth_eccentricity = 0.081819221456
+
+            gmst = self.sim.initial_global_time.gmst + earth_rot * self.sim.sim_time
+            position = dcms.euler_2_dcm(gmst, 3) @ position
+            x = np.arctan2(position[2], np.sqrt(position[0] ** 2 + position[1] ** 2))
+            x_old = 100
+            while abs(x - x_old) > 1e-8:
+                x_old = x
+                radius_of_curvature = earth_radius / np.sqrt((1 - earth_eccentricity ** 2 * np.sin(x) ** 2))
+                x = np.arctan2(
+                    position[2] + radius_of_curvature * earth_eccentricity ** 2 * np.sin(x),
+                    np.sqrt(position[0] ** 2 + position[1] ** 2)
+                )
+
+            latitude = x
+            longitude = np.arctan2(position[1], position[0])
+
+            self.gt_values["longitude"][1].setText(f"{np.rad2deg(longitude):.3f}")
+            self.gt_values["latitude"][1].setText(f"{np.rad2deg(latitude):.3f}")
         else:
             for value in self.state_values.values():
                 value[1].setText("—")
             for value in self.ce_values.values():
+                value[1].setText("—")
+            for value in self.gt_values.values():
                 value[1].setText("—")
             self.labels["name"].setText("No RSO Selected")

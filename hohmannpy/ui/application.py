@@ -17,6 +17,7 @@ from . import rendering, toolbars, dockers, tables
 #   - Option to enable docker after closing it.
 #   - Pause rendering of non-visible tabs.
 #   - FPS tracker.
+#   - Favicon not showing.
 class MainWindow(PySide6.QtWidgets.QMainWindow):
     def __init__(self, sim):
         super().__init__()
@@ -114,17 +115,35 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
     def set_sim_speed(self, signal):
         match signal:
             case "1x":
-                self.sim.speed_factor = 1
+                if self.sim.speed_factor != 0:
+                    self.sim.speed_factor = 1
+                else:
+                    self.sim.old_speed_factor = 1
             case "10x":
-                self.sim.speed_factor = 10
+                if self.sim.speed_factor != 0:
+                    self.sim.speed_factor = 10
+                else:
+                    self.sim.old_speed_factor = 10
             case "100x":
-                self.sim.speed_factor = 100
+                if self.sim.speed_factor != 0:
+                    self.sim.speed_factor = 100
+                else:
+                    self.sim.old_speed_factor = 100
             case "1000x":
-                self.sim.speed_factor = 1000
+                if self.sim.speed_factor != 0:
+                    self.sim.speed_factor = 1000
+                else:
+                    self.sim.old_speed_factor = 1000
             case "10000x":
-                self.sim.speed_factor = 10000
+                if self.sim.speed_factor != 0:
+                    self.sim.speed_factor = 10000
+                else:
+                    self.sim.old_speed_factor = 10000
             case "100000x":
-                self.sim.speed_factor = 100000
+                if self.sim.speed_factor != 0:
+                    self.sim.speed_factor = 100000
+                else:
+                    self.sim.old_speed_factor = 100000
 
     @PySide6.QtCore.Slot(bool)
     def set_play_pause(self, signal):

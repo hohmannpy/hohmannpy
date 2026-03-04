@@ -10,6 +10,8 @@ import pygfx as gfx
 import numpy as np
 import pylinalg as la
 
+from ...astro import conversions
+
 if TYPE_CHECKING:
     from .. import application
 
@@ -128,7 +130,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         position_chunks = []
         color_chunks = []  # Need to store colors point-wise so the single Line can have multiple colors.
 
-        position_buffer_break = np.array([[np.nan, np.nan, np.nan], [np.nan, np.nan, np.nan]], dtype=np.float32)
+        position_buffer_break = np.full((3, 3), np.nan, dtype=np.float32)
         color_buffer_break = np.array([[0, 0, 0, 0]], dtype=np.float32)
 
         # For each satellite, generate the dense trajectory from the spline and then create the corresponding
@@ -138,7 +140,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
             self.positions[name] = self.positions[name].astype(np.float32)  # Data type needed by gfx.Geometry.
 
             color = np.array(gfx.Color(satellite.color), dtype=np.float32)
-            color_chunk = np.tile(color, (len(self.positions[name]) + 1, 1))  # +1 to account for flex positions.
+            color_chunk = np.tile(color, (len(self.positions[name]) + 2, 1))  # +1 to account for flex positions.
 
             position_chunks.append(np.vstack([self.positions[name], position_buffer_break]))
             color_chunks.append(np.vstack([color_chunk, color_buffer_break]))
@@ -225,14 +227,12 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
                             velocity = self.sim.splines["velocities"][name](self.sim.sim_time) * 1000
                             grav_param = self.sim.satellites[name].orbit.grav_param
 
-                            sm_axis = -grav_param / (
-                                np.linalg.norm(velocity) ** 2 / 2 - grav_param / np.linalg.norm(position))
-                            if sm_axis < 0:
-                                sm_axis *= -1
+                            sm_axis, _, _, _, _, _ = conversions.state_2_classical(position, velocity, grav_param)
                             period = 2 * np.pi * np.sqrt(sm_axis ** 3 / grav_param)
 
-                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - period)
-                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + period)
+                            horizon = period
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + horizon)
                         case "full":
                             lower_index = 0
                             upper_index = len(self.dense_times)
@@ -240,28 +240,46 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
                             lower_index = 0
                             upper_index = np.searchsorted(self.dense_times, self.sim.sim_time)
                         case "hour":
-                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60)
-                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60)
+                            horizon = 60 * 60
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + horizon)
                         case "half_day":
-                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60 * 12)
-                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60 * 12)
+                            horizon = 60 * 60 * 12
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + horizon)
                         case "day":
-                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60 * 24)
-                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60 * 24)
+                            horizon = 60 * 60 * 24
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + horizon)
                         case "custom":
-                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - self.sim.custom_horizon)
-                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + self.sim.custom_horizon)
+                            horizon = self.sim.custom_horizon
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + horizon)
 
                     # For the portion of the orbit_buffer corresponding to this satellite's trajectory (found via
                     # base_index) set the rows between lower and upper index to their actual values.
                     self.orbit_buffer[base_orbit_index + lower_index: base_orbit_index + upper_index, :] = (
                         self.positions[name][lower_index:upper_index, :]
                     )
-                    if self.sim.horizon_display_mode == "past":  # Need flex position to prevent jitter.
+
+                    # Need to add flex positions at the upper and lower edges of the orbits to prevent jitter.
+                    if self.sim.horizon_display_mode == "past":
                         self.orbit_buffer[base_orbit_index + upper_index, :] = (
                             self.sim.splines["positions"][name](self.sim.sim_time).astype(np.float32)
-                        )  # Add flex position.
-                base_orbit_index += self.positions[name].shape[0] + 2  # Move to start of next satellite's trajectory.
+                        )
+                    elif self.sim.horizon_display_mode == "full":
+                        pass
+                    else:
+                        if self.sim.sim_time + horizon < self.sim.final_sim_time:
+                            self.orbit_buffer[base_orbit_index + upper_index, :] = (
+                                self.sim.splines["positions"][name](self.sim.sim_time + horizon).astype(np.float32)
+                            )
+                        if self.sim.sim_time - horizon > 0:
+                            self.orbit_buffer[base_orbit_index + lower_index - 1, :] = (
+                                self.sim.splines["positions"][name](self.sim.sim_time - horizon).astype(np.float32)
+                            )
+
+                base_orbit_index += self.positions[name].shape[0] + 3  # Move to start of next satellite's trajectory.
 
             # Update the satellite's positions using similar logic as with the orbits.
             if self.sim.orbit_display_mode != "traj":
@@ -281,7 +299,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
 
         # Standard rendering code, also orients the camera. If the camera is supposed to be orbiting the Earth we just
         # have it orbit (0, 0, 0). However, if it is orbiting a satellite we instead shift the entire pygfx.Scene (as
-        # the  scene is itself an object located in the frame of pygfx.Canvas) so that that object lives at (0, 0, 0).
+        # the scene is itself an object located in the frame of pygfx.Canvas) so that that object lives at (0, 0, 0).
         # This is done because the logic of pygfx.OrbitController breaks when trying to follow a moving target.
         if self.sim.focus is None:
             target = np.array([0, 0, 0])

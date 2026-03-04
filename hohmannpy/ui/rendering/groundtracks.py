@@ -6,10 +6,10 @@ import imageio.v3 as iio
 import numpy as np
 import scipy as sp
 
-from ...astro import groundtracks
+from ...astro import groundtracks, conversions
 
 
-# TODO: Finish lower indexing for all times, and insert point for "past" display mode, and add sat icons.
+# TODO: Documentation.
 class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
     """
     Render engine for the groundtrack scene.
@@ -70,7 +70,7 @@ class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
         self.gt_lengths = {}
         self.lead_points = {}
         self.lag_points = {}
-        gt_buffer_break = np.array([[np.nan, np.nan, np.nan], [np.nan, np.nan, np.nan]], dtype=np.float32)
+        gt_buffer_break = np.full((3, 3), np.nan, dtype=np.float32)
         color_buffer_break = np.array([[0, 0, 0, 0]], dtype=np.float32)
 
         gt_buffer = []
@@ -104,7 +104,8 @@ class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
             self.lead_points[name] = []
             self.lag_points[name] = []
             for i in range(1, len(self.dense_times)):
-                if abs(dense_wrapped_longitudes[i] - dense_wrapped_longitudes[i - 1]) > np.pi:
+                delta = dense_wrapped_longitudes[i] - dense_wrapped_longitudes[i - 1]
+                if abs(delta) > np.pi:
                     partial_gt_chunk = np.hstack(
                         (
                             dense_wrapped_longitudes[base_index:i],
@@ -119,28 +120,38 @@ class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
                     )
                     self.gt_lengths[name].append(partial_gt_chunk.shape[0])
 
-                    if np.sign(dense_wrapped_longitudes[i, 0]) < 0:
+                    if delta < 0:  # Left to right case.
                         lead_latitude = np.interp(
                             np.pi,
                             (dense_wrapped_longitudes[i - 1, 0], dense_wrapped_longitudes[i, 0] + 2 * np.pi),
                             (dense_latitudes[i - 1, 0], dense_latitudes[i, 0])
                         )
-                    else:
+
+                        lead_point = np.array([[-np.pi, lead_latitude, 1]])
+                        lead_point[:, 0] = self.img_width / (2 * np.pi) * lead_point[:, 0]
+                        lead_point[:, 1] = self.img_height / np.pi * lead_point[:, 1]
+                        self.lead_points[name].append(lead_point.astype(np.float32))
+
+                        lag_point = np.array([[np.pi, lead_latitude, 1]])
+                        lag_point[:, 0] = self.img_width / (2 * np.pi) * lag_point[:, 0]
+                        lag_point[:, 1] = self.img_height / np.pi * lag_point[:, 1]
+                        self.lag_points[name].append(lag_point.astype(np.float32))
+                    else:  # Right to left case.
                         lead_latitude = np.interp(
                             -np.pi,
-                            (dense_wrapped_longitudes[i - 1, 0], dense_wrapped_longitudes[i, 0] - 2 * np.pi),
-                            (dense_latitudes[i - 1, 0], dense_latitudes[i, 0])
+                            (dense_wrapped_longitudes[i, 0] - 2 * np.pi, dense_wrapped_longitudes[i - 1, 0]),
+                            (dense_latitudes[i, 0], dense_latitudes[i - 1, 0])
                         )
 
-                    lead_point = np.array([[-np.pi, lead_latitude, 1]])
-                    lead_point[:, 0] = self.img_width / (2 * np.pi) * lead_point[:, 0]
-                    lead_point[:, 1] = self.img_height / np.pi * lead_point[:, 1]
-                    self.lead_points[name].append(lead_point.astype(np.float32))
+                        lead_point = np.array([[np.pi, lead_latitude, 1]])
+                        lead_point[:, 0] = self.img_width / (2 * np.pi) * lead_point[:, 0]
+                        lead_point[:, 1] = self.img_height / np.pi * lead_point[:, 1]
+                        self.lead_points[name].append(lead_point.astype(np.float32))
 
-                    lag_point = np.array([[np.pi, lead_latitude, 1]])
-                    lag_point[:, 0] = self.img_width / (2 * np.pi) * lag_point[:, 0]
-                    lag_point[:, 1] = self.img_height / np.pi * lag_point[:, 1]
-                    self.lag_points[name].append(lag_point.astype(np.float32))
+                        lag_point = np.array([[-np.pi, lead_latitude, 1]])
+                        lag_point[:, 0] = self.img_width / (2 * np.pi) * lag_point[:, 0]
+                        lag_point[:, 1] = self.img_height / np.pi * lag_point[:, 1]
+                        self.lag_points[name].append(lag_point.astype(np.float32))
 
                     base_index = i
             partial_gt_chunk = np.hstack(
@@ -187,6 +198,32 @@ class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
 
         self._scene.add(self.objects["gt_polyline"])
 
+        # Repeat the above process but this time with a pygfx.Points object in order to render the satellites
+        # themselves.
+        satellite_chunks = []
+        color_chunks = []
+
+        for name, satellite in self.sim.satellites.items():
+            latitude = self.latitude_splines[name](self.sim.sim_time)[0]
+            longitude = self.longitude_splines[name](self.sim.sim_time)[0]
+            longitude = (longitude + np.pi) % (2 * np.pi) - np.pi
+
+            longitude = self.img_width / (2 * np.pi) * longitude
+            latitude = self.img_height / np.pi * latitude
+
+            satellite_chunks.append(np.array([[latitude, longitude, 2]]).astype(np.float32))
+            color_chunks.append(np.array(gfx.Color(satellite.color)).astype(np.float32))
+
+        satellite_buffer = np.vstack(satellite_chunks)
+        color_buffer = np.vstack(color_chunks)
+
+        self.objects["satellite_points"] = gfx.Points(
+            geometry=gfx.Geometry(positions=satellite_buffer, colors=color_buffer),
+            material=gfx.PointsMaterial(size=12, color_mode="vertex")
+        )
+        self._scene.add(self.objects["satellite_points"])
+        self.satellite_buffer = satellite_buffer
+
         # Draw the finalized canvas and add it to the gui.
         self._canvas.request_draw(self.animate)
 
@@ -204,8 +241,10 @@ class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
             return
 
         self.gt_buffer[:, :] = np.nan  # Flush the buffer.
+        self.satellite_buffer[:, :] = np.nan
 
         buffer_index = 0
+        sat_buffer_index = 0
         for name in self.sim.satellites.keys():
             if self.sim.orbit_display_mode != "rso":
                 if self.sim.satellite_display_flags[name]:
@@ -215,70 +254,182 @@ class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
                             velocity = self.sim.splines["velocities"][name](self.sim.sim_time) * 1000
                             grav_param = self.sim.satellites[name].orbit.grav_param
 
-                            sm_axis = -grav_param / (
-                                    np.linalg.norm(velocity) ** 2 / 2 - grav_param / np.linalg.norm(position))
-                            if sm_axis < 0:
-                                sm_axis *= -1
+                            sm_axis, _, _, _, _, _ = conversions.state_2_classical(position, velocity, grav_param)
                             period = 2 * np.pi * np.sqrt(sm_axis ** 3 / grav_param)
+
+                            horizon = period
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + horizon)
                         case "full":
-                            temp_index = buffer_index
-                            for i, chunk in enumerate(self.gt_chunks[name]):
-                                if i != 0:
-                                    self.gt_buffer[temp_index - 4] = self.lag_points[name][i - 1]
-                                    self.gt_buffer[temp_index - 1] = self.lead_points[name][i - 1]
-                                self.gt_buffer[temp_index : temp_index + self.gt_lengths[name][i]] = chunk
-                                temp_index += self.gt_lengths[name][i] + 4
+                            lower_index = 0
+                            upper_index = len(self.dense_times)
                         case "past":
-                            dense_index = 0
+                            lower_index = 0
                             upper_index = np.searchsorted(self.dense_times, self.sim.sim_time)
-                            temp_index = buffer_index
-                            for i, chunk in enumerate(self.gt_chunks[name]):
-                                if dense_index + self.gt_lengths[name][i] < upper_index:
-                                    if i < len(self.gt_chunks[name]) - 1:
-                                        self.gt_buffer[temp_index + self.gt_lengths[name][i]] = self.lag_points[name][i]
-                                        self.gt_buffer[temp_index + self.gt_lengths[name][i] + 3] = self.lead_points[name][i]
-                                    self.gt_buffer[temp_index: temp_index + self.gt_lengths[name][i]] = chunk
-                                    temp_index += self.gt_lengths[name][i] + 4
-                                    dense_index += self.gt_lengths[name][i]
-                                else:
-                                    self.gt_buffer[temp_index: temp_index + upper_index - dense_index] = (
-                                        chunk[: upper_index - dense_index, :]
-                                    )
-                                    break
                         case "hour":
-                            dense_index = 0
-                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - 60 * 60)
-                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + 60 * 60)
-
-                            temp_index = buffer_index
-                            for i, chunk in enumerate(self.gt_chunks[name]):
-                                if sum(self.gt_lengths[name][:i]):
-                                    pass
-                                if dense_index + self.gt_lengths[name][i] < upper_index:
-                                    if i < len(self.gt_chunks[name]) - 1:
-                                        self.gt_buffer[temp_index + self.gt_lengths[name][i]] = self.lag_points[name][i]
-                                        self.gt_buffer[temp_index + self.gt_lengths[name][i] + 3] = \
-                                        self.lead_points[name][i]
-                                    self.gt_buffer[temp_index: temp_index + self.gt_lengths[name][i]] = chunk
-                                    temp_index += self.gt_lengths[name][i] + 4
-                                    dense_index += self.gt_lengths[name][i]
-                                else:
-                                    self.gt_buffer[temp_index: temp_index + upper_index - dense_index] = (
-                                        chunk[: upper_index - dense_index, :]
-                                    )
-                                    break
+                            horizon = 60 * 60
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + horizon)
                         case "half_day":
-                            pass
+                            horizon = 60 * 60 * 12
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + horizon)
                         case "day":
-                            pass
+                            horizon = 60 * 60 * 24
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + horizon)
                         case "custom":
-                            pass
+                            horizon = self.sim.custom_horizon
+                            lower_index = np.searchsorted(self.dense_times, self.sim.sim_time - horizon)
+                            upper_index = np.searchsorted(self.dense_times, self.sim.sim_time + horizon)
 
-            buffer_index += sum(self.gt_lengths[name]) + 4 * (len(self.gt_lengths[name]) - 1) + 2
+                    gt_index = buffer_index
+                    chunk_start_index = 0
+                    chunk_end_index = 0
+                    buffering = False
+                    for i, chunk in enumerate(self.gt_chunks[name]):
+                        chunk_end_index += self.gt_lengths[name][i]
+                        last_chunk = i
+
+                        if not buffering:
+                            if chunk_start_index <= lower_index < chunk_end_index:
+                                flex_lag_index = gt_index + lower_index - chunk_start_index - 1
+                                if upper_index <= chunk_end_index:
+                                    self.gt_buffer[
+                                        gt_index + lower_index - chunk_start_index
+                                            : gt_index + upper_index - chunk_start_index,
+                                        :
+                                    ] = self.gt_chunks[name][i][lower_index - chunk_start_index
+                                            : upper_index - chunk_start_index,
+                                            :
+                                    ]
+
+                                    flex_lead_index = gt_index + upper_index - chunk_start_index
+                                    break
+                                else:
+                                    self.gt_buffer[
+                                        gt_index + lower_index - chunk_start_index
+                                            : gt_index + self.gt_lengths[name][i],
+                                        :
+                                    ] = self.gt_chunks[name][i][lower_index - chunk_start_index :, :]
+                                first_chunk = i - 1
+                                buffering = True
+                        else:
+                            if i > 0:
+                                if upper_index == chunk_start_index:
+                                    flex_lead_index = gt_index - 5
+                                    break
+
+                                self.gt_buffer[gt_index - 5, :] = self.lag_points[name][i - 1]
+                                self.gt_buffer[gt_index - 1, :] = self.lead_points[name][i - 1]
+                            if chunk_start_index < upper_index <= chunk_end_index:
+                                self.gt_buffer[
+                                    gt_index : gt_index + upper_index - chunk_start_index, :
+                                ] = self.gt_chunks[name][i][: upper_index - chunk_start_index, :]
+                                flex_lead_index = gt_index + upper_index - chunk_start_index
+                                break
+
+                            else:
+                                self.gt_buffer[
+                                    gt_index : gt_index + self.gt_lengths[name][i], :
+                                ] = self.gt_chunks[name][i]
+
+                        chunk_start_index += self.gt_lengths[name][i]
+
+                        if i != len(self.gt_lengths[name]) - 1:
+                            gt_index += self.gt_lengths[name][i] + 5
+                        else:
+                            gt_index += self.gt_lengths[name][i]
+
+                    if self.sim.horizon_display_mode == "past":
+                        flex_lead_latitude = self.latitude_splines[name](self.sim.sim_time)[0]
+                        flex_lead_longitude = self.longitude_splines[name](self.sim.sim_time)[0]
+                        flex_lead_longitude = (flex_lead_longitude + np.pi) % (2 * np.pi) - np.pi
+
+                        flex_lead_longitude = self.img_width / (2 * np.pi) * flex_lead_longitude
+                        flex_lead_latitude = self.img_height / np.pi * flex_lead_latitude
+
+                        delta = flex_lead_longitude - self.gt_buffer[flex_lead_index - 1, 0]
+                        if abs(delta) > self.img_width / 2:
+                            self.gt_buffer[flex_lead_index, :] = self.lag_points[name][last_chunk]
+                            self.gt_buffer[flex_lead_index + 2, :] = self.lead_points[name][last_chunk]
+                            self.gt_buffer[flex_lead_index + 3, :] = (
+                                np.array([[flex_lead_longitude, flex_lead_latitude, 1]]).astype(np.float32)
+                            )
+                        else:
+                            self.gt_buffer[flex_lead_index, :] = (
+                                np.array([[flex_lead_longitude, flex_lead_latitude, 1]]).astype(np.float32)
+                            )
+                    elif self.sim.horizon_display_mode == "full":
+                        pass
+                    else:
+                        lag_time = self.sim.sim_time - horizon
+                        lead_time = self.sim.sim_time + horizon
+
+                        if lead_time < self.sim.final_sim_time:
+                            flex_lead_latitude = self.latitude_splines[name](self.sim.sim_time + horizon)[0]
+                            flex_lead_longitude = self.longitude_splines[name](self.sim.sim_time + horizon)[0]
+                            flex_lead_longitude = (flex_lead_longitude + np.pi) % (2 * np.pi) - np.pi
+
+                            flex_lead_longitude = self.img_width / (2 * np.pi) * flex_lead_longitude
+                            flex_lead_latitude = self.img_height / np.pi * flex_lead_latitude
+
+                            delta = flex_lead_longitude - self.gt_buffer[flex_lead_index - 1, 0]
+                            if abs(delta) > self.img_width / 2:
+                                self.gt_buffer[flex_lead_index, :] = self.lag_points[name][last_chunk]
+                                self.gt_buffer[flex_lead_index + 2, :] = self.lead_points[name][last_chunk]
+                                self.gt_buffer[flex_lead_index + 3, :] = (
+                                    np.array([[flex_lead_longitude, flex_lead_latitude, 1]]).astype(np.float32)
+                                )
+                            else:
+                                self.gt_buffer[flex_lead_index, :] = (
+                                    np.array([[flex_lead_longitude, flex_lead_latitude, 1]]).astype(np.float32)
+                                )
+
+                        if lag_time > 0:
+                            flex_lag_latitude = self.latitude_splines[name](self.sim.sim_time - horizon)[0]
+                            flex_lag_longitude = self.longitude_splines[name](self.sim.sim_time - horizon)[0]
+                            flex_lag_longitude = (flex_lag_longitude + np.pi) % (2 * np.pi) - np.pi
+
+                            flex_lag_longitude = self.img_width / (2 * np.pi) * flex_lag_longitude
+                            flex_lag_latitude = self.img_height / np.pi * flex_lag_latitude
+
+                            delta = self.gt_buffer[flex_lag_index + 1, 0] - flex_lag_longitude
+                            if abs(delta) > self.img_width / 2:
+                                self.gt_buffer[flex_lag_index - 3, :] = (
+                                    np.array([[flex_lag_longitude, flex_lag_latitude, 1]]).astype(np.float32)
+                                )
+                                self.gt_buffer[flex_lag_index - 2, :] = self.lag_points[name][first_chunk]
+                                self.gt_buffer[flex_lag_index, :] = self.lead_points[name][first_chunk]
+                            else:
+                                self.gt_buffer[flex_lag_index, :] = (
+                                    np.array([[flex_lag_longitude, flex_lag_latitude, 1]]).astype(np.float32)
+                                )
+
+            buffer_index += sum(self.gt_lengths[name]) + 5 * (len(self.gt_lengths[name]) - 1) + 2
+
+            # Update the satellite's positions using similar logic as with the orbits.
+            if self.sim.orbit_display_mode != "traj":
+                if self.sim.satellite_display_flags[name]:
+                    latitude = self.latitude_splines[name](self.sim.sim_time)[0]
+                    longitude = self.longitude_splines[name](self.sim.sim_time)[0]
+                    longitude = (longitude + np.pi) % (2 * np.pi) - np.pi
+
+                    longitude = self.img_width / (2 * np.pi) * longitude
+                    latitude = self.img_height / np.pi * latitude
+
+                    self.satellite_buffer[sat_buffer_index, :] = (
+                        np.array([[longitude, latitude, 2]]).astype(np.float32)
+                    )
+
+                sat_buffer_index += 1
 
         # Rebuild buffers.
         self.objects["gt_polyline"].geometry.positions.set_data(
             self.gt_buffer
+        )
+        self.objects["satellite_points"].geometry.positions.set_data(
+            self.satellite_buffer
         )
 
         self._renderer.render(self._scene, self._camera)
