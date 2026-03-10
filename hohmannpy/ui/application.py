@@ -12,11 +12,9 @@ from . import rendering, toolbars, dockers, tables
 
 
 # TODO:
-#   - Hovering over satellite displays name, clicking focuses it.
+#   - (Post-alpha) Hovering over satellite displays name, clicking focuses it.
+#   - (Post-alpha) FPS tracking on all tabs.
 #   - Document these classes.
-#   - Option to enable docker after closing it.
-#   - Pause rendering of non-visible tabs.
-#   - FPS tracker.
 class MainWindow(PySide6.QtWidgets.QMainWindow):
     def __init__(self, sim):
         super().__init__()
@@ -99,6 +97,10 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         )
         self.shortcuts["shift+space"].setContext(PySide6.QtCore.Qt.WidgetWithChildrenShortcut)
         self.shortcuts["shift+space"].activated.connect(self.on_shift_space_press)
+
+        menu = self.menuBar().addMenu("Menu")
+        docker_menu = menu.addMenu("Dockers")
+        docker_menu.addAction(self.elements["dock"].toggleViewAction())
 
     @PySide6.QtCore.Slot(str)
     def set_horizon(self, signal):
