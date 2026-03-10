@@ -122,7 +122,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
 
             self.labels["name"].setText(self.sim.satellites[self.sim.focus].name)
 
-            # Update groundtrack.
+            # Update groundtrack. See astro.Groundtrack() for the algorithm used.
             earth_rot = 7.292115e-5  # Mean rotation rate of the Earth in rad/s.
             earth_radius = 6378.1363e3
             earth_eccentricity = 0.081819221456

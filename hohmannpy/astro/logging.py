@@ -24,7 +24,7 @@ class Logger(ABC):
         self.current_index: int = 0
 
     @abstractmethod
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         r"""
         Sets up a logger.
 
@@ -55,7 +55,7 @@ class Logger(ABC):
         pass
 
     @abstractmethod
-    def log(self, current_orbit: orbit.Orbit):
+    def log(self, current_orbit: orbits.Orbit):
         r"""
         Fills in the Nth column of each history array with the orbit's current values for each data.
 
@@ -97,6 +97,11 @@ class StateLogger(Logger):
         "x-Position [m]", "y-Position [m]", "z-Position [m]",
         "x-Velocity [m/s]", "y-Velocity [m/s]", "z-Velocity [m/s]",
     ]
+    attributes = [
+        "time_history",
+        "position_history",
+        "velocity_history"
+    ]
 
     def __init__(self):
         super().__init__()
@@ -105,7 +110,7 @@ class StateLogger(Logger):
         self.velocity_history = None
         self.time_history = None
 
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         length = timesteps + burns * 2 + 1
 
         self.position_history = np.zeros([3, length])
@@ -116,7 +121,7 @@ class StateLogger(Logger):
         self.velocity_history[:, 0] = initial_orbit.velocity
         self.time_history[0, 0] = initial_orbit.time
 
-    def log(self, current_orbit: orbit.Orbit):
+    def log(self, current_orbit: orbits.Orbit):
         self.current_index += 1  # Increment index.
 
         self.position_history[:, self.current_index] = current_orbit.position
@@ -173,6 +178,18 @@ class ClassicalElementsLogger(Logger):
         "True Anomaly [rad]",
         "Longitude of Periapsis [rad]", "Argument of Latitude [rad]", "True Latitude [rad]"
     ]
+    attributes = [
+        "sm_axis_history",
+        "sl_rectum_history",
+        "eccentricity_history",
+        "inclination_history",
+        "raan_history",
+        "argp_history",
+        "true_anomaly_history",
+        "longp_history",
+        "argl_history",
+        "true_latitude_history"
+    ]
 
     def __init__(self):
         super().__init__()
@@ -188,7 +205,7 @@ class ClassicalElementsLogger(Logger):
         self.argl_history = None
         self.true_latitude_history = None
 
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         length = timesteps + burns * 2 + 1
 
         self.sm_axis_history = np.zeros([1, length])
@@ -213,7 +230,7 @@ class ClassicalElementsLogger(Logger):
         self.argl_history[0, 0] = initial_orbit.argl
         self.true_latitude_history[0, 0] = initial_orbit.true_latitude
 
-    def log(self, current_orbit: orbit.Orbit):
+    def log(self, current_orbit: orbits.Orbit):
         self.current_index += 1  # Increment index.
 
         self.sm_axis_history[0, self.current_index] = current_orbit.sm_axis
@@ -264,6 +281,12 @@ class EquinoctialElementsLogger(Logger):
         "e-component 1", "e-component 2",
         "n-component 2", "n-component 2",
     ]
+    attributes = [
+        "e_component1_history",
+        "e_component2_history",
+        "n_component1_history",
+        "n_component2_history",
+    ]
 
     def __init__(self):
         super().__init__()
@@ -273,7 +296,7 @@ class EquinoctialElementsLogger(Logger):
         self.n_component1_history = None
         self.n_component2_history = None
 
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         length = timesteps + burns * 2 + 1
 
         self.e_component1_history = np.zeros([1, length])
@@ -286,7 +309,7 @@ class EquinoctialElementsLogger(Logger):
         self.n_component1_history[0, 0] = initial_orbit.n_component1
         self.n_component2_history[0, 0] = initial_orbit.n_component2
 
-    def log(self, current_orbit: orbit.Orbit):
+    def log(self, current_orbit: orbits.Orbit):
         self.current_index += 1  # Increment index.
 
         self.e_component1_history[0, self.current_index] = current_orbit.e_component1
@@ -316,20 +339,21 @@ class EccentricAnomalyLogger(Logger):
     """
 
     labels = ["Eccentric Anomaly [rad]"]
+    attributes = ["eccentric_anomaly_history"]
 
     def __init__(self):
         super().__init__()
 
         self.eccentric_anomaly_history = None
 
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         length = timesteps + burns * 2 + 1
 
         self.eccentric_anomaly_history = np.zeros([1, length])
 
         self.eccentric_anomaly_history[0, 0] = initial_orbit.eccentric_anomaly
 
-    def log(self, current_orbit: orbit.Orbit):
+    def log(self, current_orbit: orbits.Orbit):
         self.current_index += 1  # Increment index.
 
         self.eccentric_anomaly_history[0, self.current_index] = current_orbit.eccentric_anomaly
@@ -352,6 +376,7 @@ class UniversalVariableLogger(Logger):
     """
 
     labels = ["Universal Variable, Stumpff Parameter [rad]"]
+    attributes = ["universal_variable_history", "stumpff_param_history"]
 
     def __init__(self):
         super().__init__()
@@ -359,7 +384,7 @@ class UniversalVariableLogger(Logger):
         self.universal_variable_history = None
         self.stumpff_param_history = None
 
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         length = timesteps + burns * 2 + 1
 
         self.universal_variable_history = np.zeros([1, length])
@@ -368,7 +393,7 @@ class UniversalVariableLogger(Logger):
         self.universal_variable_history[0, 0] = initial_orbit.universal_variable
         self.stumpff_param_history[0, 0] = initial_orbit.stumpff_param
 
-    def log(self, current_orbit: orbit.Orbit):
+    def log(self, current_orbit: orbits.Orbit):
         self.current_index += 1  # Increment index.
 
         self.universal_variable_history[0, self.current_index] = current_orbit.universal_variable

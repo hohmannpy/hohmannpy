@@ -17,7 +17,6 @@ from . import rendering, toolbars, dockers, tables
 #   - Option to enable docker after closing it.
 #   - Pause rendering of non-visible tabs.
 #   - FPS tracker.
-#   - Favicon not showing.
 class MainWindow(PySide6.QtWidgets.QMainWindow):
     def __init__(self, sim):
         super().__init__()
@@ -45,9 +44,10 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
         orbit_viewer = rendering.orbits.OrbitRenderer(self.sim, tabs)
         gt_viewer = rendering.GroundtrackRenderer(self.sim, tabs)
+        graph_viewer = rendering.PlotsRenderer(self.sim)
         tabs.addTab(orbit_viewer, "Orbit")
         tabs.addTab(gt_viewer, "Groundtrack")
-        tabs.addTab(PySide6.QtWidgets.QWidget(), "Data Visualizer")
+        tabs.addTab(graph_viewer, "Data Visualizer")
         orbit_viewer.space_pressed.connect(self.on_space_press)
 
         dock = dockers.PropertiesDocker(self.sim)
@@ -65,10 +65,12 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.elements = {
             "orbit" : orbit_viewer,
             "groundtrack" : gt_viewer,
+            "graphs" : graph_viewer,
             "toolbar" : toolbar,
             "tabs" : tabs,
             "dock" : dock,
             "status" : status,
+            "rso_table" : None,
         }
 
         # Some additional qt stuff for key press handling.
@@ -154,8 +156,17 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
             self.sim.speed_factor = self.sim.old_speed_factor
 
     def open_rso_table(self):
-        table = tables.RSOTable(self.sim)
-        table.show()
+        if self.elements["rso_table"] is None:
+            self.elements["rso_table"] = tables.RSOTable(self.sim)
+            self.elements["rso_table"].setAttribute(PySide6.QtCore.Qt.WA_DeleteOnClose)
+            self.elements["rso_table"].destroyed.connect(self.on_rso_table_closed)
+            self.elements["rso_table"].show()
+        else:
+            self.elements["rso_table"].raise_()
+            self.elements["rso_table"].activateWindow()
+
+    def on_rso_table_closed(self):
+        self.elements["rso_table"] = None
 
     def reset_sim(self):
         self.sim.initial_local_time = time.perf_counter()

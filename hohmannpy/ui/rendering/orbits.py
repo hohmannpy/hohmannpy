@@ -208,9 +208,9 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         # numpy array. For each satellite (although in this case we use only their trajectory via this classes'
         # position attribute) we determine which indices range corresponds to the current horizon flag. In the
         # orbit_buffer we then only set these indices to their actual position values and leave the rest as NaN.
-        #   Each chunk also has an extra buffer row added in for a "flex position". This allows the insertion of an
-        # extra dynamically-computed vertex computed every frame by calling the position spline. This way the orbit
-        # exactly matches up the with the RSO when the horizon is set to "past" and doesn't jitter.
+        #   Each chunk also has an extra twp buffer rows added in for "flex positions". This allows the insertion of
+        # extra dynamically-computed vertexes computed every frame by calling the position spline. This way the orbit
+        # exactly matches up the with the RSO when the horizon is moving and doesn't jitter.
         #   Satellites are updated using similar logic.
         base_orbit_index = 0  # Where vertically in the buffer we are.
         base_satellite_index = 0
@@ -266,7 +266,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
                     if self.sim.horizon_display_mode == "past":
                         self.orbit_buffer[base_orbit_index + upper_index, :] = (
                             self.sim.splines["positions"][name](self.sim.sim_time).astype(np.float32)
-                        )
+                        )  # For "past" mode only need upper.
                     elif self.sim.horizon_display_mode == "full":
                         pass
                     else:
