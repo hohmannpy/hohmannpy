@@ -44,7 +44,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
         orbit_viewer = rendering.orbits.OrbitRenderer(self.sim, tabs)
         gt_viewer = rendering.GroundtrackRenderer(self.sim, tabs)
-        graph_viewer = rendering.PlotsRenderer(self.sim)
+        graph_viewer = rendering.PlotsRenderer(self.sim, tabs)
         tabs.addTab(orbit_viewer, "Orbit")
         tabs.addTab(gt_viewer, "Groundtrack")
         tabs.addTab(graph_viewer, "Data Visualizer")
@@ -99,7 +99,6 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         )
         self.shortcuts["shift+space"].setContext(PySide6.QtCore.Qt.WidgetWithChildrenShortcut)
         self.shortcuts["shift+space"].activated.connect(self.on_shift_space_press)
-
 
     @PySide6.QtCore.Slot(str)
     def set_horizon(self, signal):
