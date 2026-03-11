@@ -5,7 +5,7 @@ import PySide6.QtGui
 
 from ..astro import conversions
 
-# TODO: Documentation.
+
 class RSOTable(PySide6.QtWidgets.QDialog):
     """
     Table which holds information on all the RSOs in the sim.
@@ -37,7 +37,7 @@ class RSOTable(PySide6.QtWidgets.QDialog):
         header.setSectionResizeMode(0, PySide6.QtWidgets.QHeaderView.Stretch)  # Set column to take up any extra space.
         header.setSectionResizeMode(1, PySide6.QtWidgets.QHeaderView.ResizeToContents)
         header.setSectionResizeMode(7, PySide6.QtWidgets.QHeaderView.ResizeToContents)
-        self.table.setEditTriggers(PySide6.QtWidgets.QAbstractItemView.NoEditTriggers)  # Need or user can overwrite cells.
+        self.table.setEditTriggers(PySide6.QtWidgets.QAbstractItemView.NoEditTriggers)  # Need or user can edit cells.
 
         self.checkboxes = []
         for i, (name, satellite) in enumerate(self.sim.satellites.items()):
@@ -105,6 +105,7 @@ class RSOTable(PySide6.QtWidgets.QDialog):
         self.timer.timeout.connect(self.frame_update)
         self.timer.start(250)
 
+    # Qt signal/slot functionality for the table's buttons and checkboxes.
     def satellite_toggled(self, name, checked):
         self.sim.satellite_display_flags[name] = checked
 

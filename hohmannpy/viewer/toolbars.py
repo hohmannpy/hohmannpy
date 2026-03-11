@@ -4,8 +4,11 @@ import PySide6.QtCore
 import PySide6.QtGui
 
 
-# TODO: Documentation.
 class ToolBar(PySide6.QtWidgets.QToolBar):
+    """
+    A set of buttons/shortcuts always available to the user.
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -32,7 +35,7 @@ class ToolBar(PySide6.QtWidgets.QToolBar):
         self.addWidget(self.orbit_display)
 
         # RHS.
-        self.addWidget(spacer)
+        self.addWidget(spacer)  # Spacer auto separates LHS and RHS.
 
         self.addWidget(self.focus_previous)
         self.addWidget(self.focus_earth)
@@ -41,6 +44,8 @@ class ToolBar(PySide6.QtWidgets.QToolBar):
         self.addWidget(self.reset)
 
 
+# All the toolbar buttons are defined below. Apologies for the limited documentation, they are all just QButton's which
+# emitt signals picked up by slots in the Viewer.
 class RSOTableButton(PySide6.QtWidgets.QToolButton):
     rso_table = PySide6.QtCore.Signal()
     def __init__(self):
@@ -100,6 +105,10 @@ class HorizonDisplayModeButton(PySide6.QtWidgets.QToolButton):
         self.setPopupMode(PySide6.QtWidgets.QToolButton.InstantPopup)
 
     def custom_dialog(self):
+        """
+        If the user wants to input a custom horizon this opens a popup dialog where they can enter it.
+        """
+
         valid_input = False
         while not valid_input:
             horizon, valid_input = PySide6.QtWidgets.QInputDialog.getDouble(

@@ -7,8 +7,6 @@ import numpy as np
 from ...astro import logging, conversions
 
 
-# TODO: (Post-Alpha) Add feature to close an individual plot.
-#   - Documentation.
 class PlotsRenderer(PySide6.QtWidgets.QWidget):
     """
     Render engine for plots.

@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 
 from . import propagation, perturbations, time, logging, spacecraft
-from ..ui import application
+from ..viewer import viewing
 
 
 # TODO:

@@ -1,3 +1,3 @@
 from . import astro
 from . import dynamics
-from . import ui
+from . import viewer

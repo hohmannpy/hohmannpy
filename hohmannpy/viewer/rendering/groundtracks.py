@@ -9,9 +9,6 @@ import scipy as sp
 from ...astro import groundtracks, conversions
 
 
-# TODO:
-#  - Documentation.
-#  - This will break if there is a single point while splining.
 class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
     """
     Render engine for the groundtrack scene.

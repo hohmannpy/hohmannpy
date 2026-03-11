@@ -1,5 +1,4 @@
 import importlib.resources
-from typing import TYPE_CHECKING
 
 import imageio.v3 as iio
 import PySide6.QtWidgets
@@ -12,13 +11,7 @@ import pylinalg as la
 
 from ...astro import conversions
 
-if TYPE_CHECKING:
-    from .. import application
 
-
-# TODO:
-#   - Add built in ECI basis in bottom right.
-#   - Visible Sun for scene.
 class OrbitRenderer(PySide6.QtWidgets.QWidget):
     """
     Render engine for the orbital scene.
@@ -29,9 +22,9 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
     def __init__(self, sim, tabs):
         super().__init__()
 
-        self.sim: application.SimManager = sim
+        self.sim = sim
         self.initial_gmst = sim.initial_global_time.gmst
-        self.objects : dict[str, gfx.WorldObject] = {}
+        self.objects = {}
         self.tabs = tabs
 
         # Set up the internal pygfx rendering via a QRenderWidget. This is placed inside a normal QWidget so that UI
