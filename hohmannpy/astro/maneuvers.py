@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Callable, TYPE_CHECKING
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 import numpy as np
 import scipy as sp
@@ -117,6 +117,11 @@ class ContinuousBurn(perturbations.Perturbation):
         ``Time`` object.
     inertial : bool
         Whether the ``velocity_change`` is parameterized in planet-centered inertial coordinates.
+    masses : Any[Optional[scipy.BSpline, Callable]]
+        The mass can optionally change over the course of the burn. If it does, the masses of the satellite over time
+        can be provided as either a (N, 2) lookup table of (time, mass) entries where the first row is the mass at
+        ``start_time`` and the last is the mass at ``end_time`` or alternatively as a function. Can not be a lambda
+        function as this interferes with parallel processing capabilities.
 
     Attributes
     ----------
@@ -128,12 +133,18 @@ class ContinuousBurn(perturbations.Perturbation):
         ``Time`` object.
     inertial : bool
         Whether the ``velocity_change`` is parameterized in planet-centered inertial coordinates.
+    masses : Any[Optional[scipy.BSpline, Callable]]
+        The mass can optionally change over the course of the burn. If it does, the masses of the satellite over time
+        can be provided as either a (N, 2) lookup table of (time, mass) entries where the first row is the mass at
+        ``start_time`` and the last is the mass at ``end_time`` or alternatively as a function. Can not be a lambda
+        function as this interferes with parallel processing capabilities.
     """
 
     def __init__(
             self,
             start_time: Any[float, time.Time],
             end_time: Any[float, time.Time],
+            masses: Optional[Any[np.ndarray, Callable]] = None,
             inertial: bool = False,
     ):
         super().__init__()
@@ -141,6 +152,18 @@ class ContinuousBurn(perturbations.Perturbation):
         self.start_time = start_time
         self.end_time = end_time
         self.inertial = inertial
+
+        if masses is not None:
+            if masses is Callable:
+                self.masses = masses
+            else:
+                self.masses = sp.interpolate.make_interp_spline(
+                    masses[:, 0],
+                    masses[:, 1:],
+                    k=1
+                )  # Interpolate the mass table.
+
+        self.masses = masses
 
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""
@@ -210,22 +233,19 @@ class ConstantContinuousBurn(ContinuousBurn):
         ``Time`` object.
     thrust : np.ndarray
         Constant thrust to burn at as a (3, ) array.
+    masses : Any[Optional[scipy.BSpline, Callable]]
+        The mass can optionally change over the course of the burn. If it does, the masses of the satellite over time
+        can be provided as either a (N, 2) lookup table of (time, mass) entries where the first row is the mass at
+        ``start_time`` and the last is the mass at ``end_time`` or alternatively as a function. Can not be a lambda
+        function as this interferes with parallel processing capabilities.
     inertial : bool
         Whether the ``velocity_change`` is parameterized in planet-centered inertial coordinates.
 
     Attributes
     ----------
-    start_time : Any[float, :class:`~hohmannpy.astro.Time`]
-        The time at which the burn is to begin. Can either be the relative time since mission start in seconds or a
-        ``Time`` object.
-    end_time : Any[float, :class:`~hohmannpy.astro.Time`]
-        The time at which the burn is to end. Can either be the relative time since mission start in seconds or a
-        ``Time`` object.
     thrust : np.ndarray
         Constant thrust to burn at as a (3, ) array. By default, this is assumed to be in the satellite's
         radial-transverse-normal (RTN) frame unless ``inertial`` is set to ``True``.
-    inertial : bool
-        Whether the ``velocity_change`` is parameterized in planet-centered inertial coordinates.
     """
 
     def __init__(
@@ -233,9 +253,10 @@ class ConstantContinuousBurn(ContinuousBurn):
             start_time: Any[float, time.Time],
             end_time: Any[float, time.Time],
             thrust: np.ndarray,
+            masses: Optional[Any[np.ndarray, Callable]] = None,
             inertial: bool = False,
     ):
-        super().__init__(start_time, end_time, inertial)
+        super().__init__(start_time, end_time, masses, inertial)
 
         self.thrust = thrust
 
@@ -249,6 +270,9 @@ class ConstantContinuousBurn(ContinuousBurn):
             thrust = sat_2_inertial_dcm @ self.thrust.copy()
         else:
             thrust = self.thrust
+
+        if self.masses is not None:
+            satellite.mass = self.masses(time)
 
         return thrust / satellite.mass
 
@@ -265,23 +289,20 @@ class LookupContinuousBurn(ContinuousBurn):
     end_time : Any[float, :class:`~hohmannpy.astro.Time`]
         The time at which the burn is to end. Can either be the relative time since mission start in seconds or a
         ``Time`` object.
-    times : np.ndarray,
-        (N, ) array of times corresponding to thrusts values in the ``thrusts`` parameter. The first index should be
-        ``initial_time`` and the last index should be ``end_time``.
     thrusts : np.ndarray
-        (3, N) array of (3, ) thrusts at N timesteps ranging from ``initial_time`` to ``end_time``. By default, this is
+        (N, 4) array of (time, (3, ) thrust) at N timesteps ranging from ``start_time`` to ``end_time``. Each row
+        consists of the time for that entry followed by the 1, 2, and 3 components of the thrust. By default, this is
         assumed to be in the satellite's radial-transverse-normal (RTN) frame unless ``inertial`` is set to ``True``.
+    masses : Any[Optional[scipy.BSpline, Callable]]
+        The mass can optionally change over the course of the burn. If it does, the masses of the satellite over time
+        can be provided as either a (N, 2) lookup table of (time, mass) entries where the first row is the mass at
+        ``start_time`` and the last is the mass at ``end_time`` or alternatively as a function. Can not be a lambda
+        function as this interferes with parallel processing capabilities.
     inertial : bool
         Whether the ``velocity_change`` is parameterized in planet-centered inertial coordinates.
 
     Attributes
     ----------
-    start_time : Any[float, :class:`~hohmannpy.astro.Time`]
-        The time at which the burn is to begin. Can either be the relative time since mission start in seconds or a
-        ``Time`` object.
-    end_time : Any[float, :class:`~hohmannpy.astro.Time`]
-        The time at which the burn is to end. Can either be the relative time since mission start in seconds or a
-        ``Time`` object.
     burn_spline : scipy.BSpline
         Cubic spline of the thrust. Calling it via ``burn_spline(time)`` returns the interpolated thrust at that time.
     """
@@ -290,17 +311,17 @@ class LookupContinuousBurn(ContinuousBurn):
             self,
             start_time: Any[float, time.Time],
             end_time: Any[float, time.Time],
-            times: np.ndarray,
             thrusts: np.ndarray,
+            masses: Optional[Any[np.ndarray, Callable]] = None,
             inertial: bool = False,
     ):
-        super().__init__(start_time, end_time, inertial)
+        super().__init__(start_time, end_time, masses, inertial)
 
         self.burn_spline = sp.interpolate.make_interp_spline(
-            times.squeeze(),
-            thrusts,
+            thrusts[:, 0],
+            thrusts[:, 1:],
             k=3
-        )  # Interpolate the time and thrust tables.
+        )  # Interpolate the thrust table.
 
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""
@@ -312,6 +333,9 @@ class LookupContinuousBurn(ContinuousBurn):
             thrust = sat_2_inertial_dcm @ self.burn_spline(time)
         else:
             thrust = self.burn_spline(time)
+
+        if self.masses is not None:
+            satellite.mass = self.masses(time)
 
         return thrust / satellite.mass
 
@@ -331,24 +355,21 @@ class FunctionContinuousBurn(ContinuousBurn):
     thrust_function: Callable,
         Function which when passed an input via ``thrust_function(time)`` returns the thrust as a (3, ) numpy array. By
         default, this is assumed to be in the satellite's radial-transverse-normal (RTN) frame unless ``inertial`` is
-        set to ``True``.
+        set to ``True``. Can not be a lambda function as this interferes with parallel processing capabilities.
+    masses : Any[Optional[scipy.BSpline, Callable]]
+        The mass can optionally change over the course of the burn. If it does, the masses of the satellite over time
+        can be provided as either a (N, 2) lookup table of (time, mass) entries where the first row is the mass at
+        ``start_time`` and the last is the mass at ``end_time`` or alternatively as a function. Can not be a lambda
+        function as this interferes with parallel processing capabilities.
     inertial : bool
         Whether the ``velocity_change`` is parameterized in planet-centered inertial coordinates.
 
     Attributes
     ----------
-    start_time : Any[float, :class:`~hohmannpy.astro.Time`]
-        The time at which the burn is to begin. Can either be the relative time since mission start in seconds or a
-        ``Time`` object.
-    end_time : Any[float, :class:`~hohmannpy.astro.Time`]
-        The time at which the burn is to end. Can either be the relative time since mission start in seconds or a
-        ``Time`` object.
     thrust_function: Callable,
         Function which when passed an input via ``thrust_function(time)`` returns the thrust as a (3, ) numpy array. By
         default, this is assumed to be in the satellite's radial-transverse-normal (RTN) frame unless ``inertial`` is
         set to ``True``.
-    inertial : bool
-        Whether the ``velocity_change`` is parameterized in planet-centered inertial coordinates.
     """
 
     def __init__(
@@ -356,9 +377,10 @@ class FunctionContinuousBurn(ContinuousBurn):
             start_time: Any[float, time.Time],
             end_time: Any[float, time.Time],
             thrust_function: Callable,
+            masses: Optional[Any[np.ndarray, Callable]] = None,
             inertial: bool = False,
     ):
-        super().__init__(start_time, end_time, inertial)
+        super().__init__(start_time, end_time, masses, inertial)
 
         self.thrust_function = thrust_function
 
@@ -372,5 +394,8 @@ class FunctionContinuousBurn(ContinuousBurn):
             thrust = sat_2_inertial_dcm @ self.thrust_function(time)
         else:
             thrust = self.thrust_function(time)
+
+        if self.masses is not None:
+            satellite.mass = self.masses(time)
 
         return thrust / satellite.mass

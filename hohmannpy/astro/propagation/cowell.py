@@ -238,18 +238,18 @@ class CowellPropagator(base.Propagator):
         y4_dot = -satellite.orbit.grav_param / radius ** 3 * y[1]
         y5_dot = -satellite.orbit.grav_param / radius ** 3 * y[2]
 
-        # Append perturbing forces.
-        if self.perturbing_forces is not None:
-            for perturbing_force in self.perturbing_forces:
-                y3_perturb, y4_perturb, y5_perturb = perturbing_force.evaluate(t, y, satellite)
+        # Append active continuous burns. Do these first because they can change masses.
+        for burn in satellite.continuous_burns:
+            if burn.start_time <= t <= burn.end_time:  # Check if burn is active.
+                y3_perturb, y4_perturb, y5_perturb = burn.evaluate(t, y, satellite)
                 y3_dot += y3_perturb
                 y4_dot += y4_perturb
                 y5_dot += y5_perturb
 
-        # Append active continuous burns.
-        for burn in satellite.continuous_burns:
-            if burn.start_time <= t <= burn.end_time:  # Check if burn is active.
-                y3_perturb, y4_perturb, y5_perturb = burn.evaluate(t, y, satellite)
+        # Append perturbing forces.
+        if self.perturbing_forces is not None:
+            for perturbing_force in self.perturbing_forces:
+                y3_perturb, y4_perturb, y5_perturb = perturbing_force.evaluate(t, y, satellite)
                 y3_dot += y3_perturb
                 y4_dot += y4_perturb
                 y5_dot += y5_perturb

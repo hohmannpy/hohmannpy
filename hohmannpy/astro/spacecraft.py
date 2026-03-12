@@ -94,7 +94,7 @@ class Satellite:
             starting_orbit: orbits.Orbit,
             color: str = "#FF073A",
             burns: Optional[list[Union[maneuvers.ImpulsiveBurn, maneuvers.ContinuousBurn]]] = None,
-            mass: float = None,  # TODO: Make this Any[float, Callable].
+            mass: float = None,
             ballistic_coeff: float = None,
             mean_reflective_area: float = None,
             reflectivity: float = None
