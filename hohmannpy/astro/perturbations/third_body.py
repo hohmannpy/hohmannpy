@@ -1,6 +1,7 @@
 from __future__ import annotations
-from typing import Union, TYPE_CHECKING
+from typing import Union
 import copy
+import functools
 
 import numpy as np
 import scipy as sp
@@ -43,14 +44,6 @@ class ThirdBodyGravity(base.Perturbation):
 
     Attributes
     ----------
-    tb_grav_param : float
-        Gravitational parameter of the third body.
-    legendre: bool
-        Whether to use a Legendre polynomial expansion in the computation of the third body's perturbing effects. Used
-        to avoid small difference numerical accuracy losses from the difference between the two position cubics due to
-        their potential similarities.
-    legendre_series_length: int
-        If a Legendre polynomial expansion is used, how many terms to include.
     third_body: :class:`~hohmannpy.astro.Satellite`
         The object which holds the orbit of the third body.
     central_body: :class:`~hohmannpy.astro.Satellite`
@@ -80,22 +73,22 @@ class ThirdBodyGravity(base.Perturbation):
     ):
         super().__init__()
 
-        self.tb_grav_param = third_body_grav_param
-        self.legendre = legendre
-        self.legendre_series_length = legendre_series_length
-        self.dcm = dcm
+        self._tb_grav_param = third_body_grav_param
+        self._legendre = legendre
+        self._legendre_series_length = legendre_series_length
+        self._dcm = dcm
         self.third_body = third_body
         self.central_body = central_body
 
         # If no DCM is passed set it to a 3x3 identity matrix.
-        if self.dcm is None:
-            self.dcm = np.array(([1, 0, 0], [0, 1, 0], [0, 0, 1]))
+        if self._dcm is None:
+            self._dcm = np.array(([1, 0, 0], [0, 1, 0], [0, 0, 1]))
 
         # Setup finished in finalize__init__() which is called by the Mission.
         self.tb_orbit_spline = None
         self.cb_orbit_spline = None
 
-    def finalize__init__(self, initial_global_time: time.Time, final_global_time: time.Time):
+    def _finalize__init__(self, initial_global_time: time.Time, final_global_time: time.Time):
         """
         Create a ``np.BSpline`` for the third and central body's orbits.
 
@@ -118,18 +111,15 @@ class ThirdBodyGravity(base.Perturbation):
         self.third_body.loggers = [logging.StateLogger()]
 
         if self.central_body is None:
-            propagator.propagate(
+            propagator._propagate(
                 satellites={self.third_body.name: self.third_body},
                 runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,
             )
 
-            def dummy_spline(x):
-                return np.array([0, 0, 0])
-
             self.cb_orbit_spline = dummy_spline
         else:
             self.central_body.loggers = [logging.StateLogger()]
-            propagator.propagate(
+            propagator._propagate(
                 satellites={self.third_body.name: self.third_body, self.central_body.name: self.central_body},
                 runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,
             )
@@ -162,14 +152,14 @@ class ThirdBodyGravity(base.Perturbation):
         """
 
         # Calculate the position of the third body wrt. the central body and the satellite.
-        position_tb_wrt_cb = self.dcm @ (-self.cb_orbit_spline(time) + self.tb_orbit_spline(time))
+        position_tb_wrt_cb = self._dcm @ (-self.cb_orbit_spline(time) + self.tb_orbit_spline(time))
         position_tb_wrt_sat = position_tb_wrt_cb - state[:3]
 
         # The third and central body may be in the same relative location wrt. the central body if the central body is
         # very far away, such as if the perturbation is caused by the Sun. Rather than using the N-body equation in this
         # instance we can optionally rewrite it as a Legendre polynomial expansion of the cosine of the phase angle
         # between the satellite and third body wrt. the central body.
-        if self.legendre:
+        if self._legendre:
             phase_angle_cosine = (
                     np.dot(state[:3], position_tb_wrt_cb)
                         / (np.linalg.norm(state[:3]) * np.linalg.norm(position_tb_wrt_cb))
@@ -178,19 +168,19 @@ class ThirdBodyGravity(base.Perturbation):
             # Compute the Legendre polynomial series sum.
             legendre_sum = 0
             position_ratio = np.linalg.norm(state[:3]) / np.linalg.norm(position_tb_wrt_cb)
-            for i in range(1, self.legendre_series_length):
+            for i in range(1, self._legendre_series_length):
                 legendre_sum += sp.special.legendre_p(i, phase_angle_cosine) * position_ratio ** i
 
             # Compute the acceleration.
             acceleration = (
-                    -self.tb_grav_param / np.linalg.norm(position_tb_wrt_cb) ** 3
-                        * (state[:3]
+                    -self._tb_grav_param / np.linalg.norm(position_tb_wrt_cb) ** 3
+                    * (state[:3]
                            - position_tb_wrt_sat * (3 * legendre_sum + 3 * legendre_sum ** 2 + legendre_sum ** 3)
                            )
             )
         else:  # Alternative acceleration computation if the user just wants the standard N-body equation to be used.
             acceleration = (
-                self.tb_grav_param * (
+                    self._tb_grav_param * (
                     position_tb_wrt_sat / np.linalg.norm(position_tb_wrt_sat) ** 3
                         - position_tb_wrt_cb / np.linalg.norm(position_tb_wrt_cb) ** 3
                 )
@@ -299,7 +289,7 @@ class SolarGravity(ThirdBodyGravity):
         )
 
 
-    def finalize__init__(self, initial_global_time: time.Time, final_global_time: time.Time):
+    def _finalize__init__(self, initial_global_time: time.Time, final_global_time: time.Time):
         """
         Extension of :class:`~hohmannpy.astro.ThirdBodyGravity` .
         :meth:`~hohmannpy.astro.ThirdBodyGravity.finalize__init__()` that creates an Earth object and then calculates
@@ -319,15 +309,19 @@ class SolarGravity(ThirdBodyGravity):
         self.third_body = earth
 
         # Call parent class' finalize__init__() to create the needed orbit splines.
-        super().finalize__init__(initial_global_time=initial_global_time, final_global_time=final_global_time)
+        super()._finalize__init__(initial_global_time=initial_global_time, final_global_time=final_global_time)
 
         # Currently we have a spline which returns the Earth as the third body orbiting about the Sun. We want the Sun
         # to be the third body so we wrap the orbit_spline of the Earth so that it always returns the position of the
         # Sun wrt. the Earth instead.
         tb_orbit_spline = copy.deepcopy(self.tb_orbit_spline)
 
-        def inverted_spline(x):
-            return -tb_orbit_spline(x)
+        self.tb_orbit_spline = functools.partial(inverted_spline, func=tb_orbit_spline)
 
-        self.tb_orbit_spline = inverted_spline
 
+# Helper functions used.
+def dummy_spline(x):
+    return np.array([0, 0, 0])
+
+def inverted_spline(x, func):
+    return -func(x)

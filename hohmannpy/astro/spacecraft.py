@@ -191,7 +191,7 @@ class Earth(Satellite):
     def __init__(self, initial_global_time: time.Time, solver_tol: float = 1e-8):
         name = "Earth"
 
-        initial_true_anomaly = self.compute_initial_true_anomaly(initial_global_time, solver_tol)
+        initial_true_anomaly = self._compute_initial_true_anomaly(initial_global_time, solver_tol)
         starting_orbit = orbits.Orbit.from_classical_elements(
             sm_axis=149597870.7e3,
             eccentricity=0.0167086,
@@ -204,7 +204,7 @@ class Earth(Satellite):
         super().__init__(name, starting_orbit)
         self.loggers = [logging.StateLogger()]
 
-    def compute_initial_true_anomaly(self, initial_global_time: time.Time, solver_tol: float):
+    def _compute_initial_true_anomaly(self, initial_global_time: time.Time, solver_tol: float):
         r"""
         Calculates the true anomaly of the Earth at the initial date.
 

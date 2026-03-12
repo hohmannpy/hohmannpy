@@ -19,13 +19,6 @@ class Time:
     time: str
         Current UT1 time (HH:MM:SS.S).
 
-    Attributes
-    ----------
-    date: str
-        Current Gregorian date (MM/DD/YYYY).
-    time: str
-        Current UT1 time (HH:MM:SS.S).
-
     Notes
     -----
     The Julian date and GMST are calculated from Algorithms 14 and 15 respectively in Vallado [1]_.
@@ -40,8 +33,8 @@ class Time:
         if (not time[2] == ':') or (not time[5] == ':'):
             raise ValueError('Invalid time, please enter the date in HH:MM:SS.S format.')
 
-        self.date = date
-        self.time = time
+        self._date = date
+        self._time = time
         self._julian_date = None
         self._gmst = None
 
@@ -52,13 +45,13 @@ class Time:
         and February 28, 2100.
         """
 
-        month = int(self.date[:2])
-        day = int(self.date[3:5])
-        year = int(self.date[6:])
+        month = int(self._date[:2])
+        day = int(self._date[3:5])
+        year = int(self._date[6:])
 
-        hours = int(self.time[:2])
-        minutes = int(self.time[3:5])
-        seconds = float(self.time[6:])
+        hours = int(self._time[:2])
+        minutes = int(self._time[3:5])
+        seconds = float(self._time[6:])
 
         self._julian_date = (
                 367 * year - int(7 * (year + int((month + 9) / 12)) / 4) + int(275 * month / 9) + day + 1721013.5

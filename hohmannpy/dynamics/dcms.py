@@ -17,7 +17,7 @@ def euler_2_dcm(angle: float, axis: int):
     Returns
     -------
     dcm : np.ndarray
-        A DCM which rotates about the provided axis by the provided angle.
+        A (3, 3) DCM which rotates about the provided axis by the provided angle.
     """
 
     if axis == 1:

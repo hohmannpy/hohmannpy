@@ -36,8 +36,6 @@ class ImpulsiveBurn:
     velocity_change : np.ndarray
         The desired impulsive change in velocity as a (3, ) array. By default, this is assumed to be in the satellite's
         radial-transverse-normal (RTN) frame unless ``inertial`` is set to ``True``.
-    inertial : bool
-        Whether the ``velocity_change`` is parameterized in planet-centered inertial coordinates.
     """
 
     def __init__(
@@ -48,7 +46,7 @@ class ImpulsiveBurn:
     ):
         self.start_time = start_time
         self.velocity_change = velocity_change
-        self.inertial = inertial
+        self._inertial = inertial
 
     def evaluate(self, satellite: spacecraft.Satellite):
         r"""
@@ -62,8 +60,8 @@ class ImpulsiveBurn:
 
         # Orbit stores an inertial velocity, so if the user supplied an impulse coordinated in the RTN frame use a DCM
         # to transform it to the inertial frame.
-        if not self.inertial:
-            sat_2_inertial_dcm =  self.compute_sat_2_inertial_dcm(satellite)
+        if not self._inertial:
+            sat_2_inertial_dcm =  self._compute_sat_2_inertial_dcm(satellite)
             velocity_change = sat_2_inertial_dcm @ self.velocity_change.copy()
         else:
             velocity_change = self.velocity_change
@@ -71,7 +69,7 @@ class ImpulsiveBurn:
         satellite.orbit.velocity += velocity_change  # Increase velocity.
         satellite.impulsive_burn_index += 1  # Increment this index to indicate this burn fired.
 
-    def compute_sat_2_inertial_dcm(self, satellite: spacecraft.Satellite) -> np.ndarray:
+    def _compute_sat_2_inertial_dcm(self, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""
         Generate a DCM which transforms from a satellite's local frame to the inertial frame.
 
@@ -131,8 +129,6 @@ class ContinuousBurn(perturbations.Perturbation):
     end_time : Any[float, :class:`~hohmannpy.astro.Time`]
         The time at which the burn is to end. Can either be the relative time since mission start in seconds or a
         ``Time`` object.
-    inertial : bool
-        Whether the ``velocity_change`` is parameterized in planet-centered inertial coordinates.
     masses : Any[Optional[scipy.BSpline, Callable]]
         The mass can optionally change over the course of the burn. If it does, the masses of the satellite over time
         can be provided as either a (N, 2) lookup table of (time, mass) entries where the first row is the mass at
@@ -151,7 +147,7 @@ class ContinuousBurn(perturbations.Perturbation):
 
         self.start_time = start_time
         self.end_time = end_time
-        self.inertial = inertial
+        self._inertial = inertial
 
         if masses is not None:
             if masses is Callable:
@@ -190,7 +186,7 @@ class ContinuousBurn(perturbations.Perturbation):
 
         pass
 
-    def compute_sat_2_inertial_dcm(self, state):
+    def _compute_sat_2_inertial_dcm(self, state):
         r"""
         Generate a DCM which transforms from a satellite's local frame to the inertial frame.
 
@@ -265,8 +261,8 @@ class ConstantContinuousBurn(ContinuousBurn):
         See :class:`~hohmannpy.astro.ContinuousBurn`. :meth:`~hohmannpy.astro.ContinuousBurn.evaluate()`.
         """
 
-        if not self.inertial:
-            sat_2_inertial_dcm = self.compute_sat_2_inertial_dcm(state)
+        if not self._inertial:
+            sat_2_inertial_dcm = self._compute_sat_2_inertial_dcm(state)
             thrust = sat_2_inertial_dcm @ self.thrust.copy()
         else:
             thrust = self.thrust
@@ -328,8 +324,8 @@ class LookupContinuousBurn(ContinuousBurn):
         See :class:`~hohmannpy.astro.ContinuousBurn`. :meth:`~hohmannpy.astro.ContinuousBurn.evaluate()`.
         """
 
-        if not self.inertial:
-            sat_2_inertial_dcm = self.compute_sat_2_inertial_dcm(state)
+        if not self._inertial:
+            sat_2_inertial_dcm = self._compute_sat_2_inertial_dcm(state)
             thrust = sat_2_inertial_dcm @ self.burn_spline(time)
         else:
             thrust = self.burn_spline(time)
@@ -389,8 +385,8 @@ class FunctionContinuousBurn(ContinuousBurn):
         See :class:`~hohmannpy.astro.ContinuousBurn` . :meth:`~hohmannpy.astro.ContinuousBurn.evaluate()`.
         """
 
-        if not self.inertial:
-            sat_2_inertial_dcm = self.compute_sat_2_inertial_dcm(state)
+        if not self._inertial:
+            sat_2_inertial_dcm = self._compute_sat_2_inertial_dcm(state)
             thrust = sat_2_inertial_dcm @ self.thrust_function(time)
         else:
             thrust = self.thrust_function(time)

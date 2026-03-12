@@ -36,24 +36,6 @@ class UniversalVariablePropagator(base.Propagator):
         parameter being under ``stumpff_tol``.
     stumpff_series_length : int
         When the Stumpff series are computed via summation, how many terms to include.
-
-    Attributes
-    ----------
-    solver_tol: float
-        Error tolerance when performing root-finding to solver Kepler's equation.
-    fg_constraint: bool
-        Flag which indicates whether to compute the derivative of the g function (``False``) or to use a constraint to
-        eliminate it (``True``).
-    stumpff_tol: float
-        Tolerance at which to switch to the infinite series definition of the Stumpff series.
-    stumpff_series_length : int
-        When the Stumpff series are computed via summation, how many terms to include.
-    initial_times : dict[str, float]
-        The base point times at which propagation began.
-    initial_positions : dict[str, np.ndarray]
-        The base point positions at which propagation began.
-    initial_velocities : dict[str, np.ndarray]
-        The base point velocities at which propagation began.
     """
 
     name = "Universal Variable"
@@ -66,19 +48,19 @@ class UniversalVariablePropagator(base.Propagator):
             stumpff_series_length: int = 10,
             fg_constraint: bool = True
     ):
-        self.fg_constraint = fg_constraint
-        self.solver_tol = solver_tol
-        self.stumpff_tol = stumpff_tol
-        self.stumpff_series_length = stumpff_series_length
+        self._fg_constraint = fg_constraint
+        self._solver_tol = solver_tol
+        self._stumpff_tol = stumpff_tol
+        self._stumpff_series_length = stumpff_series_length
 
         # Empty dicts containing initial conditions that get filled in propagate().
-        self.initial_times = {}
-        self.initial_positions = {}
-        self.initial_velocities = {}
+        self._initial_times = {}
+        self._initial_positions = {}
+        self._initial_velocities = {}
 
         super().__init__(step_size)
 
-    def propagate(
+    def _propagate(
             self,
             satellites: dict[str, spacecraft.Satellite],
             runtime: float,
@@ -99,15 +81,15 @@ class UniversalVariablePropagator(base.Propagator):
             added a non-Keplerian propagator such as ``CowellPropagator`` must be used.
         """
 
-        super().propagate(satellites, runtime, perturbing_forces)
+        super()._propagate(satellites, runtime, perturbing_forces)
 
         # Get initial values used for propagation and set up logging capabilities. This involves iterating through each
         # satellite and extracting attributes of their orbits. Like the satellites themselves these are stored as
         # dictionaries where the satellite name is the key and the property itself is the value.
-        for name, satellite in self.satellites.items():
-            self.initial_times[name] = satellite.orbit.time
-            self.initial_positions[name] = satellite.orbit.position.copy()
-            self.initial_velocities[name] = satellite.orbit.velocity.copy()
+        for name, satellite in self._satellites.items():
+            self._initial_times[name] = satellite.orbit.time
+            self._initial_positions[name] = satellite.orbit.position.copy()
+            self._initial_velocities[name] = satellite.orbit.velocity.copy()
 
             # Conveniently, both the universal variable and Stumpff parameter start at 0.
             satellite.orbit.universal_variable = 0  # Needed for logging purposes.
@@ -117,8 +99,8 @@ class UniversalVariablePropagator(base.Propagator):
             # parabolic, and hyperbolic orbits using one set of equations it is replaced with the inverse semi-major
             # axis.
             satellite.orbit.inverse_sm_axis = (
-                (2 * satellite.orbit.grav_param / np.linalg.norm(self.initial_positions[name])
-                    - np.linalg.norm(self.initial_velocities[name]) ** 2)
+                (2 * satellite.orbit.grav_param / np.linalg.norm(self._initial_positions[name])
+                 - np.linalg.norm(self._initial_velocities[name]) ** 2)
                         / satellite.orbit.grav_param
             )
 
@@ -126,7 +108,7 @@ class UniversalVariablePropagator(base.Propagator):
             burns = len(satellite.impulsive_burns)
 
             for logger in satellite.loggers:
-                logger.setup(initial_orbit=satellite.orbit, timesteps=self.timesteps, burns=burns)
+                logger.setup(initial_orbit=satellite.orbit, timesteps=self._timesteps, burns=burns)
 
         # Begin the actual propagation loop. This is made of two loops: timesteps (outer), satellites (inner).
         # This involves a lot of logic surrounding burns which boils down to just determining when to call step(). The
@@ -142,10 +124,10 @@ class UniversalVariablePropagator(base.Propagator):
         #   7) Repeat 3-6 until all burns scheduled before the next standard time are completed.
         #   8) Take a mini-timestep from the time of the last burn till the next standard time. Then, propagate over
         #       this mini-timestep.
-        for timestep in range(1, self.timesteps + 1):
-            for name, satellite in self.satellites.items():
+        for timestep in range(1, self._timesteps + 1):
+            for name, satellite in self._satellites.items():
                 if satellite.impulsive_burns:  # Skip this step if no burns are scheduled.
-                    next_std_time = satellite.orbit.time + self.step_size
+                    next_std_time = satellite.orbit.time + self._step_size
 
                     # Burn loop.
                     while True:
@@ -162,7 +144,7 @@ class UniversalVariablePropagator(base.Propagator):
                         if next_std_time >= burn.start_time:
                             satellite.orbit.time = burn.start_time
 
-                            self.step(name, satellite)
+                            self._step(name, satellite)
 
                             # Update elements because evaluate() does not automatically change orbital parameters.
                             burn.evaluate(satellite)
@@ -173,32 +155,32 @@ class UniversalVariablePropagator(base.Propagator):
                             # Keplerian propagation is not possible over changes in angular momentum, so need to restart
                             # propagation (hence find new initial conditions) at the point immediately after the burn
                             # occurs.
-                            self.initial_times[name] = satellite.orbit.time
-                            self.initial_positions[name] = satellite.orbit.position.copy()
-                            self.initial_velocities[name] = satellite.orbit.velocity.copy()
+                            self._initial_times[name] = satellite.orbit.time
+                            self._initial_positions[name] = satellite.orbit.position.copy()
+                            self._initial_velocities[name] = satellite.orbit.velocity.copy()
 
                             satellite.orbit.universal_variable = 0
                             satellite.orbit.stumpff_param = 0
                             satellite.orbit.inverse_sm_axis = (
-                                    (2 * satellite.orbit.grav_param / np.linalg.norm(self.initial_positions[name])
-                                     - np.linalg.norm(self.initial_velocities[name]) ** 2)
+                                    (2 * satellite.orbit.grav_param / np.linalg.norm(self._initial_positions[name])
+                                     - np.linalg.norm(self._initial_velocities[name]) ** 2)
                                     / satellite.orbit.grav_param
                             )
 
-                            self.log(satellite)  # Log this data because it isn't logged in evaluate().
+                            self._log(satellite)  # Log this data because it isn't logged in evaluate().
                         else:
                             break
 
                     # After all burns, increment to the next_std_time and perform normal propagation.
                     satellite.orbit.time = next_std_time
-                    self.step(name, satellite)
+                    self._step(name, satellite)
 
                 # No burns, so simply propagate to next standard time.
                 else:
-                    satellite.orbit.time += self.step_size
-                    self.step(name, satellite)
+                    satellite.orbit.time += self._step_size
+                    self._step(name, satellite)
 
-    def step(self, name, satellite):
+    def _step(self, name, satellite):
         r"""
         One step in the propagation loop.
 
@@ -218,52 +200,52 @@ class UniversalVariablePropagator(base.Propagator):
 
         # Compute new universal variable. Use the previous universal variable as the initial guess for the
         # root-finder.
-        orbit.universal_variable = self.kepler_equation(
+        orbit.universal_variable = self._kepler_equation(
             inverse_sm_axis=orbit.inverse_sm_axis,
             grav_param=orbit.grav_param,
             time=orbit.time,
-            initial_time=self.initial_times[name],
-            initial_position=self.initial_positions[name],
-            initial_velocity=self.initial_velocities[name],
+            initial_time=self._initial_times[name],
+            initial_position=self._initial_positions[name],
+            initial_velocity=self._initial_velocities[name],
             initial_guess=orbit.universal_variable,
         )
 
         # Compute the Stumpff (c and s) functions.
         orbit.stumpff_param = orbit.inverse_sm_axis * orbit.universal_variable ** 2
-        s_func, c_func = self.stumpff_funcs(orbit.stumpff_param)
+        s_func, c_func = self._stumpff_funcs(orbit.stumpff_param)
 
         # Compute the f and g functions.
-        f_func = 1 - orbit.universal_variable ** 2 / np.linalg.norm(self.initial_positions[name]) * c_func
+        f_func = 1 - orbit.universal_variable ** 2 / np.linalg.norm(self._initial_positions[name]) * c_func
         g_func = (
-                orbit.time - self.initial_times[name]
+                orbit.time - self._initial_times[name]
                     - orbit.universal_variable ** 3 / np.sqrt(orbit.grav_param) * s_func
         )
 
         # Compute new position (and true anomaly). Only need to update fast variables because the other
         # orbital elements are constant for Keplerian orbits.
-        orbit.position = f_func * self.initial_positions[name] + g_func * self.initial_velocities[name]
-        orbit.update_true_anomaly()
-        orbit.update_argl()
-        orbit.update_true_latitude()
+        orbit.position = f_func * self._initial_positions[name] + g_func * self._initial_velocities[name]
+        orbit._update_true_anomaly()
+        orbit._update_argl()
+        orbit._update_true_latitude()
 
         # Compute fdot and gdot functions.
         fdot_func = (
                 np.sqrt(orbit.grav_param)
-                    / (np.linalg.norm(orbit.position) * np.linalg.norm(self.initial_positions[name]))
+                    / (np.linalg.norm(orbit.position) * np.linalg.norm(self._initial_positions[name]))
                     * orbit.universal_variable * (orbit.stumpff_param * s_func - 1)
         )
-        if self.fg_constraint:  # Only compute gdot function manually if constraint usage is disabled.
+        if self._fg_constraint:  # Only compute gdot function manually if constraint usage is disabled.
             gdot_func = (g_func * fdot_func + 1) / f_func
         else:
             gdot_func = 1 - orbit.universal_variable ** 2 / np.linalg.norm(orbit.position) * c_func
 
         # Compute the new velocity.
-        orbit.velocity = fdot_func * self.initial_positions[name] + gdot_func * self.initial_velocities[name]
+        orbit.velocity = fdot_func * self._initial_positions[name] + gdot_func * self._initial_velocities[name]
 
         # Save results from this timestep.
-        self.log(satellite)
+        self._log(satellite)
 
-    def stumpff_funcs(self, stumpff_param) -> tuple[float, float]:
+    def _stumpff_funcs(self, stumpff_param) -> tuple[float, float]:
         r"""
         Computes the Stumpff functions/series for a given value of the Stumpff parameter.
 
@@ -284,10 +266,10 @@ class UniversalVariablePropagator(base.Propagator):
             The "cosine" Stumpff function/series.
         """
 
-        if np.abs(stumpff_param) < self.stumpff_tol:  # Summation form.
+        if np.abs(stumpff_param) < self._stumpff_tol:  # Summation form.
             s_func = 0
             c_func = 0
-            for i in range(self.stumpff_series_length):
+            for i in range(self._stumpff_series_length):
                 s_func += (-stumpff_param) ** i / sp.special.factorial(2 * i + 3)
                 c_func += (-stumpff_param) ** i / sp.special.factorial(2 * i + 2)
         elif stumpff_param > 0:  # Trigonometric form.
@@ -307,7 +289,7 @@ class UniversalVariablePropagator(base.Propagator):
 
         return s_func, c_func
 
-    def kepler_equation(
+    def _kepler_equation(
             self,
             inverse_sm_axis: float,
             grav_param: float,
@@ -349,7 +331,7 @@ class UniversalVariablePropagator(base.Propagator):
         # Create the function to use in root-finding.
         def eq(x):
             stumpff_param = inverse_sm_axis * x ** 2
-            s_func, c_func = self.stumpff_funcs(stumpff_param)
+            s_func, c_func = self._stumpff_funcs(stumpff_param)
 
             return (
                     x ** 3 * s_func
@@ -360,6 +342,6 @@ class UniversalVariablePropagator(base.Propagator):
             )
 
         # Root-finding.
-        universal_variable = sp.optimize.newton(eq, initial_guess, tol=self.solver_tol)
+        universal_variable = sp.optimize.newton(eq, initial_guess, tol=self._solver_tol)
 
         return universal_variable

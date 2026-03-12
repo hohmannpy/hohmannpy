@@ -28,8 +28,6 @@ class Groundtrack:
 
     Attributes
     ----------
-    initial_gmst : float
-        GMST of the Earth at the satellite's initial position.
     latitude_history : np.ndarray
         The geodetic latitude of the satellite at each timestep stored in its ``time_history`` attribute.
     longitude_history : np.ndarray
@@ -37,7 +35,7 @@ class Groundtrack:
     """
 
     def __init__(self, satellite: spacecraft.Satellite, initial_gmst: float, solver_tol: float = 1e-8):
-        self.initial_gmst = initial_gmst
+        self._initial_gmst = initial_gmst
         self.latitude_history = np.zeros([1, satellite.time_history.size])
         self.longitude_history = np.zeros([1, satellite.time_history.size])
 
@@ -46,7 +44,7 @@ class Groundtrack:
         # For each discrete time in the satellite's time_history array calculate the corresponding latitude and
         # longitude using its position.
         for i in range(satellite.time_history.size):
-            gmst = self.initial_gmst + earth_rot * satellite.time_history[0, i]
+            gmst = self._initial_gmst + earth_rot * satellite.time_history[0, i]
 
             try:
                 position = satellite.position_history[:, i]

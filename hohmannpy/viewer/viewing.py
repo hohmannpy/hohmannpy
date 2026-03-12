@@ -17,6 +17,8 @@ from . import rendering, toolbars, dockers, tables
 #   - (Post-alpha) Add an option to display the ECI basis in the orbit viewer and latitude and longitude lines in the
 #       groundtrack viewer. Also add a visible Sun on screen.
 #   - (Post-alpha) The groundtrack renderer is still a little laggy. Work on ways to improve this.
+#   - (Post-alpha) Laggy when a long trajectory is rendered, need to make step size more dynamic.
+#   - (Post-alpha) Redo variables and docs to use privatization.
 class Viewer(PySide6.QtWidgets.QMainWindow):
     """
     This is the main QtWidget of the HohmannPy Viewer application. This can be used to visually display a 3D rendering
@@ -447,6 +449,7 @@ class ViewerManager:
             satellites,
             initial_global_time,
             final_global_time,
+            step_size
     ):
         self.satellites = satellites
 
@@ -459,6 +462,7 @@ class ViewerManager:
         self.final_sim_time = (final_global_time.julian_date - initial_global_time.julian_date) * 86400
         self.speed_factor = 100
         self.old_speed_factor = self.speed_factor
+        self.step_size = step_size
 
         self.satellite_display_flags = {name: True for name in self.satellites.keys()}
 

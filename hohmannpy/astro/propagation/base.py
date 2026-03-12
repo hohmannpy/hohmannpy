@@ -7,6 +7,9 @@ if TYPE_CHECKING:
     from .. import perturbations, spacecraft
 
 
+# TODO:
+#  - (Post-alpha) There is a lot of redundant code between propagators, eliminate as much of it as possible via mixins
+#        and dependency injection. Particularly wrt. UniversalVariablePropagator and EnckePropagator.
 class Propagator:
     r"""
     Base class for all orbit propagators.
@@ -21,33 +24,18 @@ class Propagator:
     step_size : float
         Time interval between propagation steps. If one is not provided by the user it will be set in ``propagate()`` to
         60 :math:`s`.
-
-    Attributes
-    ----------
-    step_size : float
-        Time interval between propagation steps. If one is not provided by the user it will be set in ``propagate()`` to
-        60 :math:`s`.
-    timesteps: Optional[int]
-        How many discrete timepoints to propagate at. This is based purely on the :attr:`step_size` and doesn't include
-        additional timesteps injected to account for events like burns.
-    satellites : Optional[dict[str, :class:`~hohmannpy.astro.Satellite`]]
-        Dictionary which hold the orbits to propagate as an attribute named ``orbit`` attached to each satellite.
-        Satellites are indexed by their name.
-    perturbing_forces : Optional[list[:class:`~hohmannpy.astro.Perturbation`]]
-        Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are added
-        a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
     """
 
     name = ""  # Set by child classes and used for command line output.
 
     def __init__(self, step_size: float = 60):
-        self.step_size = step_size
+        self._step_size = step_size
 
         self.satellites: Optional[dict[str, spacecraft.Satellite]] = None
-        self.perturbing_forces: Optional[list[perturbations.base.Perturbation]] = None
-        self.timesteps: Optional[int] = None
+        self._perturbing_forces: Optional[list[perturbations.base.Perturbation]] = None
+        self._timesteps: Optional[int] = None  # How many discrete time points to propagate at.
 
-    def propagate(
+    def _propagate(
             self,
             satellites: dict[str, spacecraft.Satellite],
             runtime: float,
@@ -71,13 +59,13 @@ class Propagator:
             added a non-Keplerian propagator such as ``CowellPropagator`` must be used.
         """
 
-        self.satellites = satellites
-        self.perturbing_forces = perturbing_forces
+        self._satellites = satellites
+        self._perturbing_forces = perturbing_forces
 
         # Compute number of discrete timesteps to propagate for.
-        self.timesteps = int(np.floor(runtime / self.step_size))
+        self._timesteps = int(np.floor(runtime / self._step_size))
 
-    def log(self, satellite: spacecraft.Satellite):
+    def _log(self, satellite: spacecraft.Satellite):
         r"""
         For a satellite being propagated access their stored :class:`~hohmannpy.astro.Logger`'s and log data.
 

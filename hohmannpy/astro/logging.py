@@ -12,12 +12,6 @@ class Logger(ABC):
     r"""
     A logger is used to store data regarding a :class:`~hohmannpy.astro.Orbit` generated on each timestep by
     :class:`~hohmannpy.astro.Propagator` . :meth:`~hohmannpy.astro.Propagator.propagate()`.
-
-    Attributes
-    ----------
-    current_index : int
-        The index corresponding to the timestep to log data at. For example, on the Nth timestep current_index = N and
-        the Nth column of each array is filled out.
     """
 
     # Each subclass contains two class variables. They are both lists and are ordered identically to how the history
@@ -26,7 +20,7 @@ class Logger(ABC):
     attributes = []  # Internal list of only history array attributes, ex. "raan_history". Stores attribute names.
 
     def __init__(self):
-        self.current_index: int = 0
+        self._current_index: int = 0  # Tracks column-wise position along all history arrays.
 
     @abstractmethod
     def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
@@ -62,7 +56,7 @@ class Logger(ABC):
     @abstractmethod
     def log(self, current_orbit: orbits.Orbit):
         r"""
-        Fills in the Nth column of each history array with the orbit's current values for each data.
+        Fills in the next empty column of each history array with the orbit's current values for each data.
 
         Parameters
         ----------
@@ -127,11 +121,11 @@ class StateLogger(Logger):
         self.time_history[0, 0] = initial_orbit.time
 
     def log(self, current_orbit: orbits.Orbit):
-        self.current_index += 1  # Increment index.
+        self._current_index += 1  # Increment index.
 
-        self.position_history[:, self.current_index] = current_orbit.position
-        self.velocity_history[:, self.current_index] = current_orbit.velocity
-        self.time_history[0, self.current_index] = current_orbit.time
+        self.position_history[:, self._current_index] = current_orbit.position
+        self.velocity_history[:, self._current_index] = current_orbit.velocity
+        self.time_history[0, self._current_index] = current_orbit.time
 
     def concatenate(self) -> np.ndarray:
         data = np.vstack((
@@ -236,18 +230,18 @@ class ClassicalElementsLogger(Logger):
         self.true_latitude_history[0, 0] = initial_orbit.true_latitude
 
     def log(self, current_orbit: orbits.Orbit):
-        self.current_index += 1  # Increment index.
+        self._current_index += 1  # Increment index.
 
-        self.sm_axis_history[0, self.current_index] = current_orbit.sm_axis
-        self.sl_rectum_history[0, self.current_index] = current_orbit.sl_rectum
-        self.eccentricity_history[0, self.current_index] = current_orbit.eccentricity
-        self.inclination_history[0, self.current_index] = current_orbit.inclination
-        self.raan_history[0, self.current_index] = current_orbit.raan
-        self.argp_history[0, self.current_index] = current_orbit.argp
-        self.true_anomaly_history[0, self.current_index] = current_orbit.true_anomaly
-        self.longp_history[0, self.current_index] = current_orbit.longp
-        self.argl_history[0, self.current_index] = current_orbit.argl
-        self.true_latitude_history[0, self.current_index] = current_orbit.true_latitude
+        self.sm_axis_history[0, self._current_index] = current_orbit.sm_axis
+        self.sl_rectum_history[0, self._current_index] = current_orbit.sl_rectum
+        self.eccentricity_history[0, self._current_index] = current_orbit.eccentricity
+        self.inclination_history[0, self._current_index] = current_orbit.inclination
+        self.raan_history[0, self._current_index] = current_orbit.raan
+        self.argp_history[0, self._current_index] = current_orbit.argp
+        self.true_anomaly_history[0, self._current_index] = current_orbit.true_anomaly
+        self.longp_history[0, self._current_index] = current_orbit.longp
+        self.argl_history[0, self._current_index] = current_orbit.argl
+        self.true_latitude_history[0, self._current_index] = current_orbit.true_latitude
 
     def concatenate(self) -> np.ndarray:
         data = np.vstack((
@@ -315,12 +309,12 @@ class EquinoctialElementsLogger(Logger):
         self.n_component2_history[0, 0] = initial_orbit.n_component2
 
     def log(self, current_orbit: orbits.Orbit):
-        self.current_index += 1  # Increment index.
+        self._current_index += 1  # Increment index.
 
-        self.e_component1_history[0, self.current_index] = current_orbit.e_component1
-        self.e_component2_history[0, self.current_index] = current_orbit.e_component2
-        self.n_component1_history[0, self.current_index] = current_orbit.n_component1
-        self.n_component2_history[0, self.current_index] = current_orbit.n_component2
+        self.e_component1_history[0, self._current_index] = current_orbit.e_component1
+        self.e_component2_history[0, self._current_index] = current_orbit.e_component2
+        self.n_component1_history[0, self._current_index] = current_orbit.n_component1
+        self.n_component2_history[0, self._current_index] = current_orbit.n_component2
 
     def concatenate(self) -> np.ndarray:
         data = np.vstack((
@@ -359,9 +353,9 @@ class EccentricAnomalyLogger(Logger):
         self.eccentric_anomaly_history[0, 0] = initial_orbit.eccentric_anomaly
 
     def log(self, current_orbit: orbits.Orbit):
-        self.current_index += 1  # Increment index.
+        self._current_index += 1  # Increment index.
 
-        self.eccentric_anomaly_history[0, self.current_index] = current_orbit.eccentric_anomaly
+        self.eccentric_anomaly_history[0, self._current_index] = current_orbit.eccentric_anomaly
 
     def concatenate(self) -> np.ndarray:
         return self.eccentric_anomaly_history.T
@@ -399,10 +393,10 @@ class UniversalVariableLogger(Logger):
         self.stumpff_param_history[0, 0] = initial_orbit.stumpff_param
 
     def log(self, current_orbit: orbits.Orbit):
-        self.current_index += 1  # Increment index.
+        self._current_index += 1  # Increment index.
 
-        self.universal_variable_history[0, self.current_index] = current_orbit.universal_variable
-        self.stumpff_param_history[0, self.current_index] = current_orbit.stumpff_param
+        self.universal_variable_history[0, self._current_index] = current_orbit.universal_variable
+        self.stumpff_param_history[0, self._current_index] = current_orbit.stumpff_param
 
     def concatenate(self) -> np.ndarray:
         data = np.vstack((

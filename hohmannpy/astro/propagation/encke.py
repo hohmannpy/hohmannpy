@@ -57,20 +57,6 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         parameter being under ``stumpff_tol``.
     stumpff_series_length : int
         When the Stumpff series are computed via summation, how many terms to include.
-
-    Attributes
-    ----------
-    rectification_tol : float
-        When the deviation between the true and reference orbits grows large enough (represented by the ratio of their
-        positions' magnitudes being greater than this tolerance), reset the rectified orbit by setting it equal to the
-        current true orbit.
-    encke_tol : float
-        When the Encke parameter is close to zero (defined by this tolerance) the Encke function, which is used to
-        compute the position, is undefined so must switch to an infinite series definition of it.
-    encke_series_length : int
-        How many terms to include when using the infinite series definition of the Encke function.
-    reference_orbits : dict[str, :class:`~hohmannpy.astro.Orbit`]
-        Keplerian orbits used as references to measure deviations of the true orbit from the Keplerian approximation.
     """
 
     name = "Encke"
@@ -86,18 +72,18 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
             stumpff_series_length: int = 10,
             fg_constraint: bool = True
     ):
-        self.rectification_tol = rectification_tol
-        self.encke_tol = encke_tol
-        self.encke_series_length = encke_series_length
+        self._rectification_tol = rectification_tol
+        self._encke_tol = encke_tol
+        self._encke_series_length = encke_series_length
 
-        # Empty dict containing initial conditions that get filled in propagate()
-        self.reference_orbits = {}
+        # Empty dict containing the reference orbits propagated via UniversalVariablePropagator in propagate().
+        self._reference_orbits = {}
 
         # Unlike other propagations which just inherit from base.Propagate(), this class instead inherits from
         # UniversalVariablePropagator so we also need to instantiate this with all its parameters.
         super().__init__(step_size, solver_tol, stumpff_tol, stumpff_series_length, fg_constraint)
 
-    def propagate(
+    def _propagate(
             self,
             satellites: dict[str, spacecraft.Satellite],
             runtime: float,
@@ -119,26 +105,26 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
 
         # Don't want to call super() because UniversalVariablePropagator.propagate() includes a bunch of extra logic we
         # don't want to run.
-        base.Propagator.propagate(self, satellites, runtime, perturbing_forces)
+        base.Propagator._propagate(self, satellites, runtime, perturbing_forces)
 
         # Get initial values used for propagation and set up logging capabilities. Note that the entire first code block
         # matches UniversalVariablePropagator.propagate() exactly, so look there for more details.
-        for name, satellite in self.satellites.items():
+        for name, satellite in self._satellites.items():
             # Setup from UniversalVariablePropagator.propagate().
-            self.initial_times[name] = satellite.orbit.time
-            self.initial_positions[name] = satellite.orbit.position.copy()
-            self.initial_velocities[name] = satellite.orbit.velocity.copy()
+            self._initial_times[name] = satellite.orbit.time
+            self._initial_positions[name] = satellite.orbit.position.copy()
+            self._initial_velocities[name] = satellite.orbit.velocity.copy()
 
-            self.reference_orbits[name] = orbits.Orbit.from_state(
+            self._reference_orbits[name] = orbits.Orbit.from_state(
                 position=satellite.orbit.position.copy(),
                 velocity=satellite.orbit.velocity.copy(),
                 grav_param=satellite.orbit.grav_param
             )
-            self.reference_orbits[name].universal_variable = 0
-            self.reference_orbits[name].stumpff_param = 0
-            self.reference_orbits[name].inverse_sm_axis = (
-                    (2 * satellite.orbit.grav_param / np.linalg.norm(self.initial_positions[name])
-                     - np.linalg.norm(self.initial_velocities[name]) ** 2)
+            self._reference_orbits[name].universal_variable = 0
+            self._reference_orbits[name].stumpff_param = 0
+            self._reference_orbits[name].inverse_sm_axis = (
+                    (2 * satellite.orbit.grav_param / np.linalg.norm(self._initial_positions[name])
+                     - np.linalg.norm(self._initial_velocities[name]) ** 2)
                     / satellite.orbit.grav_param
             )
 
@@ -146,7 +132,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
             burns = len(satellite.impulsive_burns) + len(satellite.continuous_burns)
 
             for logger in satellite.loggers:
-                logger.setup(initial_orbit=satellite.orbit, timesteps=self.timesteps, burns=burns)
+                logger.setup(initial_orbit=satellite.orbit, timesteps=self._timesteps, burns=burns)
 
         # Begin the actual propagation loop. This is made of two loops: timesteps (outer), satellites (inner).
         # This involves a lot of logic surrounding burns which boils down to just determining when to call step(). The
@@ -173,10 +159,10 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         #   6) Repeat 3-5 until all events scheduled before the next standard time are completed.
         #   7) Take a mini-timestep from the time of the last event till the next standard time. Then, propagate over
         #       this mini-timestep.
-        for timestep in range(1, self.timesteps + 1):
-            for name, satellite in self.satellites.items():
+        for timestep in range(1, self._timesteps + 1):
+            for name, satellite in self._satellites.items():
                 if satellite.impulsive_burns or satellite.continuous_burns:  # Skip this step if no burns are scheduled.
-                    next_std_time = satellite.orbit.time + self.step_size
+                    next_std_time = satellite.orbit.time + self._step_size
 
                     # Event loop.
                     while True:
@@ -218,45 +204,45 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
                         # the necessary logic.
                         if next_std_time >= next_event_time:
                             if event_type == "impulsive":
-                                self.step(name, satellite, next_event_time - satellite.orbit.time)
+                                self._step(name, satellite, next_event_time - satellite.orbit.time)
                                 impulsive_burn.evaluate(satellite)
 
                                 # Unlike with CowellPropagator, there is a bunch of extra logic needed to reset all the
                                 # initial conditions used by the reference orbits. See
                                 # UniversalVariablePropagator.propagate() for more information.
-                                self.reference_orbits[name].position = satellite.orbit.position.copy()
-                                self.reference_orbits[name].velocity = satellite.orbit.velocity.copy()
-                                self.reference_orbits[name].update_classical()
-                                self.initial_times[name] = satellite.orbit.time
-                                self.initial_positions[name] = satellite.orbit.position.copy()
-                                self.initial_velocities[name] = satellite.orbit.velocity.copy()
-                                self.reference_orbits[name].universal_variable = 0
-                                self.reference_orbits[name].stumpff_param = 0
-                                self.reference_orbits[name].inverse_sm_axis = (
-                                        (2 * satellite.orbit.grav_param / np.linalg.norm(self.initial_positions[name])
-                                         - np.linalg.norm(self.initial_velocities[name]) ** 2)
+                                self._reference_orbits[name].position = satellite.orbit.position.copy()
+                                self._reference_orbits[name].velocity = satellite.orbit.velocity.copy()
+                                self._reference_orbits[name].update_classical()
+                                self._initial_times[name] = satellite.orbit.time
+                                self._initial_positions[name] = satellite.orbit.position.copy()
+                                self._initial_velocities[name] = satellite.orbit.velocity.copy()
+                                self._reference_orbits[name].universal_variable = 0
+                                self._reference_orbits[name].stumpff_param = 0
+                                self._reference_orbits[name].inverse_sm_axis = (
+                                        (2 * satellite.orbit.grav_param / np.linalg.norm(self._initial_positions[name])
+                                         - np.linalg.norm(self._initial_velocities[name]) ** 2)
                                         / satellite.orbit.grav_param
                                 )
 
-                                self.log(satellite)  # Log this data because it isn't logged in evaluate().
+                                self._log(satellite)  # Log this data because it isn't logged in evaluate().
 
                             elif event_type == "continuous_start":
-                                self.step(name, satellite, next_event_time - satellite.orbit.time)
+                                self._step(name, satellite, next_event_time - satellite.orbit.time)
                                 satellite.continuous_burn_start_index += 1  # No evaluate() so update index manually.
                             elif event_type == "continuous_end":
-                                self.step(name, satellite, next_event_time - satellite.orbit.time)
+                                self._step(name, satellite, next_event_time - satellite.orbit.time)
                                 satellite.continuous_burn_end_index += 1
                         else:
                             break
 
                     # After all events, increment to the next_std_time and perform normal propagation.
-                    self.step(name, satellite, next_std_time - satellite.orbit.time)
+                    self._step(name, satellite, next_std_time - satellite.orbit.time)
 
                 # No events, so simply propagate to next standard time.
                 else:
-                    self.step(name, satellite, self.step_size)
+                    self._step(name, satellite, self._step_size)
 
-    def step(self, name, satellite, time_change):
+    def _step(self, name, satellite, time_change):
         r"""
         One step in the propagation loop.
 
@@ -282,23 +268,23 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         # Calculate the reference state (position, velocity) at the old time and then propagate it to the new time. Also
         # propagate it at a halfway point between them, this is needed by RK4 integration.
         old_reference_state = np.concatenate(
-            [self.reference_orbits[name].position.copy(), self.reference_orbits[name].velocity.copy()], axis=0
+            [self._reference_orbits[name].position.copy(), self._reference_orbits[name].velocity.copy()], axis=0
         )
-        self.reference_step(name, time_change / 2)
+        self._reference_step(name, time_change / 2)
         intermediate_reference_state = np.concatenate(
-            [self.reference_orbits[name].position.copy(), self.reference_orbits[name].velocity.copy()], axis=0
+            [self._reference_orbits[name].position.copy(), self._reference_orbits[name].velocity.copy()], axis=0
         )
-        self.reference_step(name, time_change / 2)
+        self._reference_step(name, time_change / 2)
 
         # Perform numerical integration to get the state difference.
-        del_state = self.rk4(
+        del_state = self._rk4(
             t0=orbit.time,
             delt=time_change,
             y0=np.concatenate((orbit.position, orbit.velocity)),
             y0_ref=old_reference_state,
             y1_ref=intermediate_reference_state,
             y2_ref=np.concatenate(
-            [self.reference_orbits[name].position, self.reference_orbits[name].velocity], axis=0
+            [self._reference_orbits[name].position, self._reference_orbits[name].velocity], axis=0
                 ),
             satellite=satellite,
         )
@@ -307,25 +293,25 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         orbit.time += time_change
 
         # Compute the true position and velocity.
-        orbit.position = self.reference_orbits[name].position + del_position
-        orbit.velocity = self.reference_orbits[name].velocity + del_velocity
+        orbit.position = self._reference_orbits[name].position + del_position
+        orbit.velocity = self._reference_orbits[name].velocity + del_velocity
 
         # Perform rectification if needed.
-        if np.linalg.norm(del_position) / np.linalg.norm(orbit.position) > self.rectification_tol:
-            self.reference_orbits[name].position = orbit.position.copy()
-            self.reference_orbits[name].velocity = orbit.velocity.copy()
-            self.reference_orbits[name].update_classical()
+        if np.linalg.norm(del_position) / np.linalg.norm(orbit.position) > self._rectification_tol:
+            self._reference_orbits[name].position = orbit.position.copy()
+            self._reference_orbits[name].velocity = orbit.velocity.copy()
+            self._reference_orbits[name].update_classical()
 
             # If rectification is performed, need to reset all the initial conditions for the reference orbit because
             # universal variable propagation over changes in angular momentum.
-            self.initial_times[name] = orbit.time
-            self.initial_positions[name] = orbit.position.copy()
-            self.initial_velocities[name] = orbit.velocity.copy()
-            self.reference_orbits[name].universal_variable = 0
-            self.reference_orbits[name].stumpff_param = 0
-            self.reference_orbits[name].inverse_sm_axis = (
-                    (2 * satellite.orbit.grav_param / np.linalg.norm(self.initial_positions[name])
-                     - np.linalg.norm(self.initial_velocities[name]) ** 2)
+            self._initial_times[name] = orbit.time
+            self._initial_positions[name] = orbit.position.copy()
+            self._initial_velocities[name] = orbit.velocity.copy()
+            self._reference_orbits[name].universal_variable = 0
+            self._reference_orbits[name].stumpff_param = 0
+            self._reference_orbits[name].inverse_sm_axis = (
+                    (2 * satellite.orbit.grav_param / np.linalg.norm(self._initial_positions[name])
+                     - np.linalg.norm(self._initial_velocities[name]) ** 2)
                     / satellite.orbit.grav_param
             )
 
@@ -335,9 +321,9 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
             orbit.update_equinoctial()
 
         # Save results from this timestep.
-        self.log(satellite)
+        self._log(satellite)
 
-    def reference_step(self, name, time_change):
+    def _reference_step(self, name, time_change):
         r"""
         Perform propagation using the universal variable form of Kepler's method for the reference orbit.
 
@@ -350,38 +336,38 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         """
 
         # For information on this, see UniversalVariablePropagator.step()
-        orbit = self.reference_orbits[name]
+        orbit = self._reference_orbits[name]
         orbit.time += time_change
 
-        orbit.universal_variable = self.kepler_equation(
+        orbit.universal_variable = self._kepler_equation(
             inverse_sm_axis=orbit.inverse_sm_axis,
             grav_param=orbit.grav_param,
             time=orbit.time,
-            initial_time=self.initial_times[name],
-            initial_position=self.initial_positions[name],
-            initial_velocity=self.initial_velocities[name],
+            initial_time=self._initial_times[name],
+            initial_position=self._initial_positions[name],
+            initial_velocity=self._initial_velocities[name],
             initial_guess=orbit.universal_variable,
         )
         orbit.stumpff_param = orbit.inverse_sm_axis * orbit.universal_variable ** 2
-        s_func, c_func = self.stumpff_funcs(orbit.stumpff_param)
-        f_func = 1 - orbit.universal_variable ** 2 / np.linalg.norm(self.initial_positions[name]) * c_func
+        s_func, c_func = self._stumpff_funcs(orbit.stumpff_param)
+        f_func = 1 - orbit.universal_variable ** 2 / np.linalg.norm(self._initial_positions[name]) * c_func
         g_func = (
-                orbit.time - self.initial_times[name]
+                orbit.time - self._initial_times[name]
                 - orbit.universal_variable ** 3 / np.sqrt(orbit.grav_param) * s_func
         )
-        orbit.position = f_func * self.initial_positions[name] + g_func * self.initial_velocities[name]
+        orbit.position = f_func * self._initial_positions[name] + g_func * self._initial_velocities[name]
         fdot_func = (
                 np.sqrt(orbit.grav_param)
-                / (np.linalg.norm(orbit.position) * np.linalg.norm(self.initial_positions[name]))
+                / (np.linalg.norm(orbit.position) * np.linalg.norm(self._initial_positions[name]))
                 * orbit.universal_variable * (orbit.stumpff_param * s_func - 1)
         )
-        if self.fg_constraint:
+        if self._fg_constraint:
             gdot_func = (g_func * fdot_func + 1) / f_func
         else:
             gdot_func = 1 - orbit.universal_variable ** 2 / np.linalg.norm(orbit.position) * c_func
-        orbit.velocity = fdot_func * self.initial_positions[name] + gdot_func * self.initial_velocities[name]
+        orbit.velocity = fdot_func * self._initial_positions[name] + gdot_func * self._initial_velocities[name]
 
-    def eom(
+    def _eom(
             self,
             t: float,
             del_y: np.ndarray,
@@ -435,9 +421,9 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
                     + del_y[2] * (y_ref[2] + 0.5 * del_y[2])
         )
 
-        if abs(encke_param) < self.encke_tol:
+        if abs(encke_param) < self._encke_tol:
             encke_func = 0
-            for i in range(1, self.encke_series_length):
+            for i in range(1, self._encke_series_length):
                 encke_func += (-sp.special.factorial2(2 * i + 3)
                                     / (sp.special.factorial(i + 1)) * encke_param ** i
                                )
@@ -463,8 +449,8 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
                 del_y5_dot += y5_perturb
 
         # Append perturbing forces.
-        if self.perturbing_forces is not None:
-            for perturbing_force in self.perturbing_forces:
+        if self._perturbing_forces is not None:
+            for perturbing_force in self._perturbing_forces:
                 y3_perturb, y4_perturb, y5_perturb = perturbing_force.evaluate(t, y, satellite)
                 del_y3_dot += y3_perturb
                 del_y4_dot += y4_perturb
@@ -472,7 +458,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
 
         return np.array([del_y0_dot, del_y1_dot, del_y2_dot, del_y3_dot, del_y4_dot, del_y5_dot])
 
-    def rk4(
+    def _rk4(
             self,
             t0: float,
             y0: np.ndarray,
@@ -514,9 +500,9 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
         """
 
         del_y0 = y0 - y0_ref
-        x1 = self.eom(t0, del_y0, y0_ref, satellite)
-        x2 = self.eom(t0 + delt / 2, del_y0 + delt / 2 * x1, y1_ref, satellite)
-        x3 = self.eom(t0 + delt / 2, del_y0 + delt / 2 * x2, y1_ref, satellite)
-        x4 = self.eom(t0 + delt, del_y0 + delt * x3, y2_ref, satellite)
+        x1 = self._eom(t0, del_y0, y0_ref, satellite)
+        x2 = self._eom(t0 + delt / 2, del_y0 + delt / 2 * x1, y1_ref, satellite)
+        x3 = self._eom(t0 + delt / 2, del_y0 + delt / 2 * x2, y1_ref, satellite)
+        x4 = self._eom(t0 + delt, del_y0 + delt * x3, y2_ref, satellite)
 
         return del_y0 + delt / 6 * (x1 + 2 * x2 + 2 * x3 + x4)

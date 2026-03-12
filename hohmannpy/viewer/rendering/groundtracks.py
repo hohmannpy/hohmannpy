@@ -43,7 +43,7 @@ class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
         self._scene.add(self.objects["projection"])
         self.objects["projection"].local.position = (-self.img_width / 2, -self.img_height / 2, 0)
 
-        # Add a top down camera to the scene.
+        # Add a top-down camera to the scene.
         self._camera = gfx.OrthographicCamera(self.img_width, self.img_height)
         self._camera.local.position = (0, 0, 10)
 
@@ -53,11 +53,11 @@ class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
         # each groundtrack split up into segments whenever this occurs. These segments are then stitched back together
         # with NaNs as breakpoints in between.
         if len(self.sim.satellites.values()) < 100:
-            density = 1
+            density = self.sim.step_size / 100
         elif len(self.sim.satellites.values()) < 1000:
-            density = 10
+            density = self.sim.step_size / 10
         else:
-            density = 100
+            density = self.sim.step_size
 
         self.positions = {}
         self.dense_times = np.arange(
