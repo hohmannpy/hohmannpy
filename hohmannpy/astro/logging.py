@@ -20,6 +20,11 @@ class Logger(ABC):
         the Nth column of each array is filled out.
     """
 
+    # Each subclass contains two class variables. They are both lists and are ordered identically to how the history
+    # arrays are added to the classes internally.
+    labels = []  # Display names for each history array, ex. "RAAN [rad]".
+    attributes = []  # Internal list of only history array attributes, ex. "raan_history". Stores attribute names.
+
     def __init__(self):
         self.current_index: int = 0
 

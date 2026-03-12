@@ -16,6 +16,7 @@ from . import rendering, toolbars, dockers, tables
 #   - (Post-alpha) FPS tracking on all tabs.
 #   - (Post-alpha) Add an option to display the ECI basis in the orbit viewer and latitude and longitude lines in the
 #       groundtrack viewer. Also add a visible Sun on screen.
+#   - (Post-alpha) The groundtrack renderer is still a little laggy. Work on ways to improve this.
 class Viewer(PySide6.QtWidgets.QMainWindow):
     """
     This is the main QtWidget of the HohmannPy Viewer application. This can be used to visually display a 3D rendering
@@ -550,5 +551,5 @@ class ViewerManager:
         self.gui = Viewer(self)
         self.gui.show()
 
-        self.timer.start(16.67)  # Update the Viewer at approximately 60 FPS.
+        self.timer.start(17)  # Update the Viewer at approximately 60 FPS.
         app.exec()

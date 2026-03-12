@@ -18,8 +18,12 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
         self.sim = sim
         self.tabs = tabs
         self.num_plots = 0
-        self.dialog = None
+        self.dialog = None  # Dialog widget that pops up when creating a new plot.
 
+        # The goal of this renderer is to render as many plots as the user wants in a 2xN grid. This necessitates some
+        # finagling with the Qt stack. The resulting layout looks like this:
+        #   Plot Renderer -> QVBoxLayout -> QScrollArea -> QGridLayout -> QWidget -> QCharts
+        #                                -> QHBoxLayout -> QButton(s)
         scroll = PySide6.QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
 
@@ -41,13 +45,21 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
         button_layout.addWidget(close_all_button)
         layout.addLayout(button_layout)
 
+        # QTimer render loop which updates all plots based on the current horizon.
         self.timer = PySide6.QtCore.QTimer(self)
         self.timer.timeout.connect(self.animate)
-        self.timer.start(32)
+        self.timer.start(33)
 
     def create_plot(self, satellite_id: str, var: np.ndarray, var_label: str):
-        times = self.sim.satellites[satellite_id].time_history
+        """
+        Add a new plot.
+        """
 
+        times = self.sim.satellites[satellite_id].time_history  # All plots have time ax the x-axis.
+
+        # Generate the data to plot. Note that as a result of impulsive burns there may be multiple data entries at the
+        # same time point. Detect this and slightly increment them or splining will throw an error. Splining is handled
+        # automatically via passing the data points into a QSplineSeries.
         for i in range(1, times.shape[1]):
             if times[0, i] <= times[0, i - 1]:
                 times[0, i] = times[0, i - 1] + 1e-9
@@ -61,7 +73,7 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
             )
         ])
 
-        # --- Chart ---
+        # Create the QChart and then inset it into a QWidget.
         chart = PySide6.QtCharts.QChart()
         chart.addSeries(spline)
         chart.createDefaultAxes()
@@ -73,11 +85,11 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
         y_axis.setTitleText(f"{satellite_id}: {var_label}")
         chart.setProperty("satellite_id", satellite_id)
 
-        # --- View ---
         plot = PySide6.QtCharts.QChartView(chart)
-        plot.setRenderHint(PySide6.QtGui.QPainter.Antialiasing)
+        plot.setRenderHint(PySide6.QtGui.QPainter.Antialiasing)  # Need or lines are super jagged.
         plot.setMinimumSize(500, 250)
 
+        # Plots a rendered in a 2xN grid, moving first down columns. This logic ensures plots are placed correctly.
         row_index = self.num_plots % 2
         col_index = self.num_plots // 2
         self.grid.addWidget(plot, row_index, col_index)
@@ -85,14 +97,22 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
         self.grid.setColumnStretch(col_index, 1)
 
         self.num_plots += 1
-        self.animate()
+        self.animate()  # Force a frame update so plot renders automatically.
 
     def open_new_plot(self):
+        """
+        Opens the dialog to create a new plot.
+        """
+
         self.dialog = NewPlotDialog(self, self.sim)
-        self.dialog.setAttribute(PySide6.QtCore.Qt.WA_DeleteOnClose)
+        self.dialog.setAttribute(PySide6.QtCore.Qt.WA_DeleteOnClose)  # Need or dialog will remain on heap upon close.
         self.dialog.show()
 
     def close_all(self):
+        """
+        Close all open plots
+        """
+
         while self.grid.count():
             item = self.grid.takeAt(0)
             widget = item.widget()
@@ -110,6 +130,9 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
         if self.tabs.currentIndex() != 2:
             return
 
+        # For each plot, clamp the time axis to only display data points in the current horizon. No special splining
+        # or buffer logic is needed here because QCharts handle this all automatically via the setRange() method owned
+        # by their axes.
         for i in range(self.grid.count()):
             chart = self.grid.itemAt(i).widget().chart()
 
@@ -151,6 +174,7 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
 
             if lower_time < 0:
                 lower_time = 0
+
             axis_x = chart.axes(PySide6.QtCore.Qt.Horizontal)[0]
             axis_x.setRange(lower_time, upper_time)
 
@@ -170,18 +194,33 @@ class NewPlotDialog(PySide6.QtWidgets.QDialog):
 
         layout = PySide6.QtWidgets.QVBoxLayout(self)  # Wrapper around the QDialog needed to actually display.
 
-        # Create satellite and plot data selectors.
+        # Create satellite and plot data selectors. This consists of two QComboBox-es (drop down menus). The first
+        # allows the user to select which satellite to plot data from and the second which data to plot. The satellites
+        # consist of all satellites propagated for the Mission. The available data consists of all the data stored by
+        # Loggers stored by the mission.
         combo_layout = PySide6.QtWidgets.QHBoxLayout()
-
         dd1 = PySide6.QtWidgets.QComboBox()
         dd2 = PySide6.QtWidgets.QComboBox()
+
         vars = {}
         for name, satellite in self.sim.satellites.items():
-            dd1.addItem(name)
+            dd1.addItem(name)  # Append a name to the first dropdown.
+
+            # The second drop down is more complicated. Each satellite has its own Logger instance, but each of those
+            # Loggers stores the same type of data. The way a QComboBox works, it has a display name as well as stored
+            # reference to the data to return when a given option is selected. We only want to display each data type
+            # option, for example "Eccentricity", but when the user selects that option it needs to then store a
+            # reference to the logged "Eccentricity" of whatever satellite is currently selected in the first dropdown.
+            # To handle this, we store all data in a dict vars. Each item in vars has a key corresponding to the name
+            # of the data type and a value corresponding to another dict. This dict has as keys the name of each
+            # satellite and as values the data corresponding to the other dict's key.
             for logger in satellite.loggers:
                 for label in logger.labels:
                     index = logger.labels.index(label)
 
+                    # This is a special case as all other Loggers only store data as (1, N) vectors. StateLogger stores
+                    # position and velocity specially as (3, N) vectors so need to split that up into (1, N) arrays so
+                    # that the user can plot "x-Position", "y-Position", etc;
                     if isinstance(logger, logging.StateLogger):
                         if index == 0:
                             continue
@@ -194,12 +233,14 @@ class NewPlotDialog(PySide6.QtWidgets.QDialog):
                     else:
                         row = 0
 
-                    var = getattr(logger, logger.attributes[index])
+                    var = getattr(logger, logger.attributes[index])  # See Logger class for details on why this works.
                     var = var[row, :]
 
+                    # If the data was logged in radians, convert to degrees.
                     if label[-5:] == "[rad]":
                         label = label[:-5] + "[deg]"
                         var = np.rad2deg(var)
+
                     if label not in (vars.keys()):
                         vars[label] = {}
                     vars[label][name] = var
@@ -226,6 +267,10 @@ class NewPlotDialog(PySide6.QtWidgets.QDialog):
         confirm_button.clicked.connect(self.create_plot)
 
     def create_plot(self):
+        """
+        Create a plot using the currently selected dropdown options.
+        """
+
         satellite_id = self.dropdowns["dd1"].currentText()
         var_label = self.dropdowns["dd2"].currentText()
         var = self.dropdowns["dd2"].currentData()[satellite_id]
