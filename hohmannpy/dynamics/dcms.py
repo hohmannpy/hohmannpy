@@ -3,7 +3,23 @@ from __future__ import annotations
 import numpy as np
 
 
-def euler_2_dcm(angle, axis):
+def euler_2_dcm(angle: float, axis: int):
+    """
+    Generate a direction cosine matrix (DCM) about the given axis (1, 2, or 3) using the provided Euler angle.
+
+    Parameters
+    ----------
+    angle : float
+        Angle to rotate by.
+    axis : int
+        Axis to rotate about.
+
+    Returns
+    -------
+    dcm : np.ndarray
+        A DCM which rotates about the provided axis by the provided angle.
+    """
+
     if axis == 1:
         dcm = np.array(
             [[1, 0, 0],
