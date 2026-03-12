@@ -203,7 +203,7 @@ class Mission:
         # Single core case.
         if self.cores == 1:
             if self.verbose:
-                print(f"Multicore: \tFalse\n")
+                print(f"Multicore: \tFalse")
 
             self.propagator.propagate(
                 satellites=self.satellites,
