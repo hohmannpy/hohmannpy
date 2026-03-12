@@ -56,6 +56,8 @@ class UniversalVariablePropagator(base.Propagator):
         The base point velocities at which propagation began.
     """
 
+    name = "Universal Variable"
+
     def __init__(
             self,
             step_size: float = 60,

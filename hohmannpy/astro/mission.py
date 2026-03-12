@@ -3,6 +3,7 @@ import copy
 import concurrent.futures
 from typing import Optional
 import pickle
+import time as python_time
 
 import pandas as pd
 import numpy as np
@@ -11,8 +12,6 @@ from . import propagation, perturbations, time, logging, spacecraft
 from ..viewer import viewing
 
 
-# TODO:
-#   - Print propagation updates.
 class Mission:
     r"""
     Master class for all orbital simulations.
@@ -38,6 +37,8 @@ class Mission:
     perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
         Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are added
         a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
+    verbose: bool
+        Whether to print information about propagation.
     cores : int
         How many cores to use propagation. If this is greater than 1 parallel computing will be enabled.
 
@@ -57,6 +58,8 @@ class Mission:
     perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
         Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are added
         a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
+    verbose: bool
+        Whether to print information about propagation.
     cores : int
         How many cores to use propagation. If this is greater than 1 parallel computing will be enabled.
     """
@@ -69,6 +72,7 @@ class Mission:
             loggers: Optional[list[logging.Logger]] = None,
             propagator: Optional[propagation.base.Propagator] = None,
             perturbing_forces: Optional[list[perturbations.Perturbation]] = None,
+            verbose: bool = True,
             cores: int = 1
     ):
         # Instantiate all the passed-in attributes.
@@ -76,6 +80,7 @@ class Mission:
         self.initial_global_time: time.Time = initial_global_time
         self.final_global_time: time.Time = final_global_time
         self.global_time: time.Time = initial_global_time
+        self.verbose: bool = verbose
         self.cores: int = cores
 
         # If the user did not pass in a propagator we need to assign one for them. If no perturbations are used we can
@@ -184,11 +189,22 @@ class Mission:
         This also contains all the parallel computing logic.
         """
 
+        if self.verbose:
+            print("Propagating...\n")
+            start_time = python_time.perf_counter()
+
         # Propagation uses units of seconds, so convert Gregorian/UT1 -> Julian Date -> seconds.
         runtime = (self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400
 
+        if self.verbose:
+            print(f"Satellites: {len(list(self.satellites))}")
+            print(f"Algorithm: \t{self.propagator.name}")
+
         # Single core case.
         if self.cores == 1:
+            if self.verbose:
+                print(f"Multicore: \tFalse\n")
+
             self.propagator.propagate(
                 satellites=self.satellites,
                 runtime=runtime,
@@ -210,25 +226,43 @@ class Mission:
             # Create the core groups.
             core_group = {}
             core_groups = []
+            core_group_ids = []
+
+            i = 1
             for name, satellite in self.satellites.items():
                 core_group[name] = satellite
 
                 # Distribute satellites to core_group until satellites_per_core is reached then move to the next group.
                 if len(core_group) == satellites_per_core:
                     core_groups.append(core_group.copy())
+                    core_group_ids.append(i)
                     core_group = {}
+
+                    i += 1
+
             if core_group:
                 core_groups.append(core_group.copy())
+                core_group_ids.append(i)
+
+            if self.verbose:
+                print(f"Multicore: \tTrue")
+                print(f"Cores: \t\t{self.cores}")
+                print(f"Sat/Core: \t{len(core_groups[0])}\n")
 
             # Execute the actual multiprocessing. This calls a helper function _parallel_propagate() which actually sets
             # up a clone of the passed in Propagator for parallel processing.
             with concurrent.futures.ProcessPoolExecutor(max_workers=self.cores) as executor:
                 for core_group in executor.map(
                         Mission._parallel_propagate,
-                        [(self.propagator, core_group, runtime, self.perturbing_forces) for core_group in core_groups]
+                        [(self.propagator, core_group, group_id, runtime, self.perturbing_forces, self.verbose) for core_group, group_id in zip(core_groups, core_group_ids)]
                 ):
                     for name, satellite in core_group.items():  # Update satellites after propagation.
                         self.satellites[name] = satellite
+
+        end_time = python_time.perf_counter()
+
+        if self.verbose:
+            print(f"\nPropagation complete in {end_time - start_time:.2f} seconds!")
 
     @staticmethod
     def _parallel_propagate(args: tuple[propagation.Propagator, dict[str, spacecraft.Satellite], float, list[perturbations.Perturbation]]) -> None:
@@ -240,7 +274,7 @@ class Mission:
 
         Parameters
         ----------
-        args : tuple[:class:`~hohmannpy.astro.Propagator`, dict[str, :class:`~hohmannpy.astro.Spacecraft], float, list[:class:~hohmannpy.astro.Perturbation`]
+        args : tuple[:class:`~hohmannpy.astro.Propagator`, dict[str, :class:`~hohmannpy.astro.Spacecraft], int, float, list[:class:~hohmannpy.astro.Perturbation`, bool]
             Tuple of arguments needed to start propagation on a core. These include the propagator itself, a ``dict`` of
             the satellites to propagate, how long to propagate for, and any perturbations.
 
@@ -250,12 +284,15 @@ class Mission:
             Propagated satellites to now reintegrate with the main ``satellite`` dict.
         """
 
-        propagator, satellites, runtime, perturbing_forces = args
+        propagator, satellites, group_id, runtime, perturbing_forces, verbose = args
         propagator.propagate(
             satellites=satellites,
             runtime=runtime,
             perturbing_forces=perturbing_forces,
         )
+
+        if verbose:
+            print(f"Core {group_id} done")
 
         return satellites
 
@@ -271,7 +308,7 @@ class Mission:
         if not any(isinstance(logger, logging.StateLogger) for logger in loggers):
             raise AttributeError("No StateLogger stored for this mission, can not generate trajectories for display.")
 
-        sim_manager = application.SimManager(self.satellites, self.initial_global_time, self.final_global_time)
+        sim_manager = viewing.ViewerManager(self.satellites, self.initial_global_time, self.final_global_time)
         sim_manager.run()
 
     def to_csv(self, target_directory: str, fp_accuracy: int):
@@ -315,17 +352,17 @@ class Mission:
                 float_format=f"%.{fp_accuracy}f"
             )
 
-    def save(self, id: str, target_directory: str):
+    def save(self, name: str, target_directory: str):
         r"""
         Pickle the ``Mission`` so that it may be loaded later.
 
          Parameters
         ----------
-        id : str
+        name : str
             Name of the pickled ``Mission``.
         target_directory : str
             The folder path to store the pickled ``Mission`` in.
         """
 
-        with open(f"{target_directory}/{id}.pkl", "wb") as f:
+        with open(f"{target_directory}/{name}.pkl", "wb") as f:
             pickle.dump(self, f)

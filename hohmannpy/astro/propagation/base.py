@@ -38,6 +38,8 @@ class Propagator:
         a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
     """
 
+    name = ""  # Set by child classes and used for command line output.
+
     def __init__(self, step_size: float = 60):
         self.step_size = step_size
 

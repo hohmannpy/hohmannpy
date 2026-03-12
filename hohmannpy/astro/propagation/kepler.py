@@ -45,6 +45,8 @@ class KeplerPropagator(base.Propagator):
         The base point eccentric anomalies at which propagation began.
     """
 
+    name = "Kepler"
+
     def __init__(
             self,
             step_size: float = 60,

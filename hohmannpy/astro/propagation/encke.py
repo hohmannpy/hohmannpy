@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from .. import spacecraft, perturbations
 
 
-# TODO: Investigating implementing functools.cache for Taylor series.
 class EnckePropagator(universal_variable.UniversalVariablePropagator):
     r"""
     Non-Keplerian propagator which uses a modified set of equations of motion where the position is given by::
@@ -73,6 +72,8 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
     reference_orbits : dict[str, :class:`~hohmannpy.astro.Orbit`]
         Keplerian orbits used as references to measure deviations of the true orbit from the Keplerian approximation.
     """
+
+    name = "Encke"
 
     def __init__(
             self,
@@ -434,12 +435,11 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator):
                     + del_y[2] * (y_ref[2] + 0.5 * del_y[2])
         )
 
-        # TODO: Validate this Taylor series by hand.
         if abs(encke_param) < self.encke_tol:
             encke_func = 0
-            for i in range(self.encke_series_length):
+            for i in range(1, self.encke_series_length):
                 encke_func += (-sp.special.factorial2(2 * i + 3)
-                                    / (sp.special.factorial(i + 1) * 2 ** (i + 1)) * encke_param ** i
+                                    / (sp.special.factorial(i + 1)) * encke_param ** i
                                )
         else:
             encke_func = 1 / encke_param * (1 - (1 - 2 * encke_param) ** -1.5)
