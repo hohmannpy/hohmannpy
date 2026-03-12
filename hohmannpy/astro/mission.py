@@ -308,7 +308,12 @@ class Mission:
         if not any(isinstance(logger, logging.StateLogger) for logger in loggers):
             raise AttributeError("No StateLogger stored for this mission, can not generate trajectories for display.")
 
-        sim_manager = viewing.ViewerManager(self.satellites, self.initial_global_time, self.final_global_time)
+        sim_manager = viewing.ViewerManager(
+            self.satellites,
+            self.initial_global_time,
+            self.final_global_time,
+            self.propagator.step_size
+        )
         sim_manager.run()
 
     def to_csv(self, target_directory: str, fp_accuracy: int):

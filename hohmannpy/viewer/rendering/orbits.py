@@ -105,11 +105,11 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         # are used to generate denser trajectory arrays. The density is determined by the number of satellites,
         # density = 1 implies that the dense trajectory has a position index every second.
         if len(self.sim.satellites.values()) < 100:
-            density = 1
+            density = self.sim.step_size / 100
         elif len(self.sim.satellites.values()) < 1000:
-            density = 10
+            density = self.sim.step_size / 10
         else:
-            density = 100
+            density = self.sim.step_size
 
         self.positions = {}  # Store the dense trajectories of each satellite in a dict.
         self.dense_times = np.arange(

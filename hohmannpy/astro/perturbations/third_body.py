@@ -1,6 +1,7 @@
 from __future__ import annotations
-from typing import Union, TYPE_CHECKING
+from typing import Union
 import copy
+import functools
 
 import numpy as np
 import scipy as sp
@@ -122,9 +123,6 @@ class ThirdBodyGravity(base.Perturbation):
                 satellites={self.third_body.name: self.third_body},
                 runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,
             )
-
-            def dummy_spline(x):
-                return np.array([0, 0, 0])
 
             self.cb_orbit_spline = dummy_spline
         else:
@@ -326,8 +324,12 @@ class SolarGravity(ThirdBodyGravity):
         # Sun wrt. the Earth instead.
         tb_orbit_spline = copy.deepcopy(self.tb_orbit_spline)
 
-        def inverted_spline(x):
-            return -tb_orbit_spline(x)
+        self.tb_orbit_spline = functools.partial(inverted_spline, func=tb_orbit_spline)
 
-        self.tb_orbit_spline = inverted_spline
 
+# Helper functions used.
+def dummy_spline(x):
+    return np.array([0, 0, 0])
+
+def inverted_spline(x, func):
+    return -func(x)

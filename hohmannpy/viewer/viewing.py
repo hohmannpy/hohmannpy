@@ -447,6 +447,7 @@ class ViewerManager:
             satellites,
             initial_global_time,
             final_global_time,
+            step_size
     ):
         self.satellites = satellites
 
@@ -459,6 +460,7 @@ class ViewerManager:
         self.final_sim_time = (final_global_time.julian_date - initial_global_time.julian_date) * 86400
         self.speed_factor = 100
         self.old_speed_factor = self.speed_factor
+        self.step_size = step_size
 
         self.satellite_display_flags = {name: True for name in self.satellites.keys()}
 
