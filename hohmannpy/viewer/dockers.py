@@ -127,7 +127,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
             earth_radius = 6378.1363e3
             earth_eccentricity = 0.081819221456
 
-            gmst = self.sim._initial_global_time.gmst + earth_rot * self.sim.sim_time
+            gmst = self.sim.initial_global_time.gmst + earth_rot * self.sim.sim_time
             position = dcms.euler_2_dcm(gmst, 3) @ position
             x = np.arctan2(position[2], np.sqrt(position[0] ** 2 + position[1] ** 2))
             x_old = 100
