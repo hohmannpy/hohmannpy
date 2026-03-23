@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional, Union
 import numpy as np
 import scipy as sp
 
-from . import orbit, logging, maneuvers
+from . import orbits, logging, maneuvers
 
 if TYPE_CHECKING:
     from . import time
@@ -91,10 +91,10 @@ class Satellite:
     def __init__(
             self,
             name: str,
-            starting_orbit: orbit.Orbit,
+            starting_orbit: orbits.Orbit,
             color: str = "#FF073A",
             burns: Optional[list[Union[maneuvers.ImpulsiveBurn, maneuvers.ContinuousBurn]]] = None,
-            mass: float = None,  # TODO: Make this Any[float, Callable].
+            mass: float = None,
             ballistic_coeff: float = None,
             mean_reflective_area: float = None,
             reflectivity: float = None
@@ -127,7 +127,7 @@ class Satellite:
         self.mean_reflective_area = mean_reflective_area
         self.reflectivity = reflectivity
 
-        self.orbit: orbit.Orbit = copy.deepcopy(starting_orbit)  # This will be updated over time by the propagator.
+        self.orbit: orbits.Orbit = copy.deepcopy(starting_orbit)  # This will be updated over time by the propagator.
         self.loggers: Optional[list[logging.Logger]] = None  # Filled in by the __init__() of Mission.
 
     def __getattr__(self, name):
@@ -160,7 +160,7 @@ class Moon(Satellite):
 
     def __init__(self, initial_true_anomaly: float):
         name = "Moon"
-        starting_orbit = orbit.Orbit.from_classical_elements(
+        starting_orbit = orbits.Orbit.from_classical_elements(
             sm_axis=3.844e8,
             eccentricity=0.0549,
             inclination=np.deg2rad(5.145),
@@ -191,8 +191,8 @@ class Earth(Satellite):
     def __init__(self, initial_global_time: time.Time, solver_tol: float = 1e-8):
         name = "Earth"
 
-        initial_true_anomaly = self.compute_initial_true_anomaly(initial_global_time, solver_tol)
-        starting_orbit = orbit.Orbit.from_classical_elements(
+        initial_true_anomaly = self._compute_initial_true_anomaly(initial_global_time, solver_tol)
+        starting_orbit = orbits.Orbit.from_classical_elements(
             sm_axis=149597870.7e3,
             eccentricity=0.0167086,
             inclination=0,
@@ -204,7 +204,7 @@ class Earth(Satellite):
         super().__init__(name, starting_orbit)
         self.loggers = [logging.StateLogger()]
 
-    def compute_initial_true_anomaly(self, initial_global_time: time.Time, solver_tol: float):
+    def _compute_initial_true_anomaly(self, initial_global_time: time.Time, solver_tol: float):
         r"""
         Calculates the true anomaly of the Earth at the initial date.
 

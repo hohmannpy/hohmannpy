@@ -5,26 +5,25 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from . import orbit
+    from . import orbits
 
 
 class Logger(ABC):
     r"""
     A logger is used to store data regarding a :class:`~hohmannpy.astro.Orbit` generated on each timestep by
     :class:`~hohmannpy.astro.Propagator` . :meth:`~hohmannpy.astro.Propagator.propagate()`.
-
-    Attributes
-    ----------
-    current_index : int
-        The index corresponding to the timestep to log data at. For example, on the Nth timestep current_index = N and
-        the Nth column of each array is filled out.
     """
 
+    # Each subclass contains two class variables. They are both lists and are ordered identically to how the history
+    # arrays are added to the classes internally.
+    labels = []  # Display names for each history array, ex. "RAAN [rad]".
+    attributes = []  # Internal list of only history array attributes, ex. "raan_history". Stores attribute names.
+
     def __init__(self):
-        self.current_index: int = 0
+        self._current_index: int = 0  # Tracks column-wise position along all history arrays.
 
     @abstractmethod
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         r"""
         Sets up a logger.
 
@@ -55,9 +54,9 @@ class Logger(ABC):
         pass
 
     @abstractmethod
-    def log(self, current_orbit: orbit.Orbit):
+    def log(self, current_orbit: orbits.Orbit):
         r"""
-        Fills in the Nth column of each history array with the orbit's current values for each data.
+        Fills in the next empty column of each history array with the orbit's current values for each data.
 
         Parameters
         ----------
@@ -97,6 +96,11 @@ class StateLogger(Logger):
         "x-Position [m]", "y-Position [m]", "z-Position [m]",
         "x-Velocity [m/s]", "y-Velocity [m/s]", "z-Velocity [m/s]",
     ]
+    attributes = [
+        "time_history",
+        "position_history",
+        "velocity_history"
+    ]
 
     def __init__(self):
         super().__init__()
@@ -105,7 +109,7 @@ class StateLogger(Logger):
         self.velocity_history = None
         self.time_history = None
 
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         length = timesteps + burns * 2 + 1
 
         self.position_history = np.zeros([3, length])
@@ -116,12 +120,12 @@ class StateLogger(Logger):
         self.velocity_history[:, 0] = initial_orbit.velocity
         self.time_history[0, 0] = initial_orbit.time
 
-    def log(self, current_orbit: orbit.Orbit):
-        self.current_index += 1  # Increment index.
+    def log(self, current_orbit: orbits.Orbit):
+        self._current_index += 1  # Increment index.
 
-        self.position_history[:, self.current_index] = current_orbit.position
-        self.velocity_history[:, self.current_index] = current_orbit.velocity
-        self.time_history[0, self.current_index] = current_orbit.time
+        self.position_history[:, self._current_index] = current_orbit.position
+        self.velocity_history[:, self._current_index] = current_orbit.velocity
+        self.time_history[0, self._current_index] = current_orbit.time
 
     def concatenate(self) -> np.ndarray:
         data = np.vstack((
@@ -173,6 +177,18 @@ class ClassicalElementsLogger(Logger):
         "True Anomaly [rad]",
         "Longitude of Periapsis [rad]", "Argument of Latitude [rad]", "True Latitude [rad]"
     ]
+    attributes = [
+        "sm_axis_history",
+        "sl_rectum_history",
+        "eccentricity_history",
+        "inclination_history",
+        "raan_history",
+        "argp_history",
+        "true_anomaly_history",
+        "longp_history",
+        "argl_history",
+        "true_latitude_history"
+    ]
 
     def __init__(self):
         super().__init__()
@@ -188,7 +204,7 @@ class ClassicalElementsLogger(Logger):
         self.argl_history = None
         self.true_latitude_history = None
 
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         length = timesteps + burns * 2 + 1
 
         self.sm_axis_history = np.zeros([1, length])
@@ -213,19 +229,19 @@ class ClassicalElementsLogger(Logger):
         self.argl_history[0, 0] = initial_orbit.argl
         self.true_latitude_history[0, 0] = initial_orbit.true_latitude
 
-    def log(self, current_orbit: orbit.Orbit):
-        self.current_index += 1  # Increment index.
+    def log(self, current_orbit: orbits.Orbit):
+        self._current_index += 1  # Increment index.
 
-        self.sm_axis_history[0, self.current_index] = current_orbit.sm_axis
-        self.sl_rectum_history[0, self.current_index] = current_orbit.sl_rectum
-        self.eccentricity_history[0, self.current_index] = current_orbit.eccentricity
-        self.inclination_history[0, self.current_index] = current_orbit.inclination
-        self.raan_history[0, self.current_index] = current_orbit.raan
-        self.argp_history[0, self.current_index] = current_orbit.argp
-        self.true_anomaly_history[0, self.current_index] = current_orbit.true_anomaly
-        self.longp_history[0, self.current_index] = current_orbit.longp
-        self.argl_history[0, self.current_index] = current_orbit.argl
-        self.true_latitude_history[0, self.current_index] = current_orbit.true_latitude
+        self.sm_axis_history[0, self._current_index] = current_orbit.sm_axis
+        self.sl_rectum_history[0, self._current_index] = current_orbit.sl_rectum
+        self.eccentricity_history[0, self._current_index] = current_orbit.eccentricity
+        self.inclination_history[0, self._current_index] = current_orbit.inclination
+        self.raan_history[0, self._current_index] = current_orbit.raan
+        self.argp_history[0, self._current_index] = current_orbit.argp
+        self.true_anomaly_history[0, self._current_index] = current_orbit.true_anomaly
+        self.longp_history[0, self._current_index] = current_orbit.longp
+        self.argl_history[0, self._current_index] = current_orbit.argl
+        self.true_latitude_history[0, self._current_index] = current_orbit.true_latitude
 
     def concatenate(self) -> np.ndarray:
         data = np.vstack((
@@ -264,6 +280,12 @@ class EquinoctialElementsLogger(Logger):
         "e-component 1", "e-component 2",
         "n-component 2", "n-component 2",
     ]
+    attributes = [
+        "e_component1_history",
+        "e_component2_history",
+        "n_component1_history",
+        "n_component2_history",
+    ]
 
     def __init__(self):
         super().__init__()
@@ -273,7 +295,7 @@ class EquinoctialElementsLogger(Logger):
         self.n_component1_history = None
         self.n_component2_history = None
 
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         length = timesteps + burns * 2 + 1
 
         self.e_component1_history = np.zeros([1, length])
@@ -286,13 +308,13 @@ class EquinoctialElementsLogger(Logger):
         self.n_component1_history[0, 0] = initial_orbit.n_component1
         self.n_component2_history[0, 0] = initial_orbit.n_component2
 
-    def log(self, current_orbit: orbit.Orbit):
-        self.current_index += 1  # Increment index.
+    def log(self, current_orbit: orbits.Orbit):
+        self._current_index += 1  # Increment index.
 
-        self.e_component1_history[0, self.current_index] = current_orbit.e_component1
-        self.e_component2_history[0, self.current_index] = current_orbit.e_component2
-        self.n_component1_history[0, self.current_index] = current_orbit.n_component1
-        self.n_component2_history[0, self.current_index] = current_orbit.n_component2
+        self.e_component1_history[0, self._current_index] = current_orbit.e_component1
+        self.e_component2_history[0, self._current_index] = current_orbit.e_component2
+        self.n_component1_history[0, self._current_index] = current_orbit.n_component1
+        self.n_component2_history[0, self._current_index] = current_orbit.n_component2
 
     def concatenate(self) -> np.ndarray:
         data = np.vstack((
@@ -316,23 +338,24 @@ class EccentricAnomalyLogger(Logger):
     """
 
     labels = ["Eccentric Anomaly [rad]"]
+    attributes = ["eccentric_anomaly_history"]
 
     def __init__(self):
         super().__init__()
 
         self.eccentric_anomaly_history = None
 
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         length = timesteps + burns * 2 + 1
 
         self.eccentric_anomaly_history = np.zeros([1, length])
 
         self.eccentric_anomaly_history[0, 0] = initial_orbit.eccentric_anomaly
 
-    def log(self, current_orbit: orbit.Orbit):
-        self.current_index += 1  # Increment index.
+    def log(self, current_orbit: orbits.Orbit):
+        self._current_index += 1  # Increment index.
 
-        self.eccentric_anomaly_history[0, self.current_index] = current_orbit.eccentric_anomaly
+        self.eccentric_anomaly_history[0, self._current_index] = current_orbit.eccentric_anomaly
 
     def concatenate(self) -> np.ndarray:
         return self.eccentric_anomaly_history.T
@@ -352,6 +375,7 @@ class UniversalVariableLogger(Logger):
     """
 
     labels = ["Universal Variable, Stumpff Parameter [rad]"]
+    attributes = ["universal_variable_history", "stumpff_param_history"]
 
     def __init__(self):
         super().__init__()
@@ -359,7 +383,7 @@ class UniversalVariableLogger(Logger):
         self.universal_variable_history = None
         self.stumpff_param_history = None
 
-    def setup(self, initial_orbit: orbit.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
         length = timesteps + burns * 2 + 1
 
         self.universal_variable_history = np.zeros([1, length])
@@ -368,11 +392,11 @@ class UniversalVariableLogger(Logger):
         self.universal_variable_history[0, 0] = initial_orbit.universal_variable
         self.stumpff_param_history[0, 0] = initial_orbit.stumpff_param
 
-    def log(self, current_orbit: orbit.Orbit):
-        self.current_index += 1  # Increment index.
+    def log(self, current_orbit: orbits.Orbit):
+        self._current_index += 1  # Increment index.
 
-        self.universal_variable_history[0, self.current_index] = current_orbit.universal_variable
-        self.stumpff_param_history[0, self.current_index] = current_orbit.stumpff_param
+        self.universal_variable_history[0, self._current_index] = current_orbit.universal_variable
+        self.stumpff_param_history[0, self._current_index] = current_orbit.stumpff_param
 
     def concatenate(self) -> np.ndarray:
         data = np.vstack((

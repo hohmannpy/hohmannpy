@@ -22,17 +22,9 @@ class SolarRadiation(base.Perturbation):
 
     Attributes
     ----------
-    irradiance_scale_factor : float
-        Constant to scale the solar irradiance by at all timesteps. Useful for representing heightened solar activity
-        such as during solar flares.
     earth_orbit_spline : :class:`numpy.BSpline`
         Linear spline of the Earth's trajectory. Calling it via ``earth_orbit_spline(time)`` returns the interpolated
         orbit at that time.
-    initial_jd_since_aphelion : float
-        Number of Julian days passed since aphelion, taken to be on the most recent July 4th before
-        ``initial_global_time``.
-    shadowing: bool
-        Flag which determines whether the Earth's shadow should be modeled.
 
     Notes
     -----
@@ -61,14 +53,14 @@ class SolarRadiation(base.Perturbation):
     ):
         super().__init__()
 
-        self.irradiance_scale_factor = irradiance_scale_factor
-        self.shadowing = shadowing
+        self._irradiance_scale_factor = irradiance_scale_factor
+        self._shadowing = shadowing
 
         # Setup finished in finalize__init__() which is called by the Mission.
         self.earth_orbit_spline = None
-        self.initial_jd_since_aphelion = None
+        self._initial_jd_since_aphelion = None
 
-    def finalize__init__(self, initial_global_time: time.Time, final_global_time: time.Time):
+    def _finalize__init__(self, initial_global_time: time.Time, final_global_time: time.Time):
         """
         Create a ``np.BSpline`` for the Earth's orbit and determine the current number of Julian days since the last
         aphelion passage.
@@ -89,7 +81,7 @@ class SolarRadiation(base.Perturbation):
         earth = spacecraft.Earth(initial_global_time)
 
         propagator = propagation.KeplerPropagator()
-        propagator.propagate(
+        propagator._propagate(
             satellites={earth.name: earth},
             runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,
         )
@@ -101,7 +93,7 @@ class SolarRadiation(base.Perturbation):
         # Compute the Julian days since the most recent aphelion. First we determine if we are in a month before or
         # after the current year's aphelion (July 4th, 12:00:00 UT1). If after just compute the Julian days since the
         # current years aphelion. If after, compute the Julian days since last year's aphelion.
-        initial_date = initial_global_time.date
+        initial_date = initial_global_time._date
         initial_month = initial_date[3:5]
 
         if int(initial_month) > 7:
@@ -110,7 +102,7 @@ class SolarRadiation(base.Perturbation):
             initial_year = int(initial_date[6:]) - 1
 
         aphelion_time = time.Time(date=f"07/04/{initial_year}", time="12:00:00")
-        self.initial_jd_since_aphelion = initial_global_time.julian_date - aphelion_time.julian_date
+        self._initial_jd_since_aphelion = initial_global_time.julian_date - aphelion_time.julian_date
 
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""
@@ -145,8 +137,8 @@ class SolarRadiation(base.Perturbation):
 
         # Compute the solar pressure. We can get the irradiance by plugging the days since the Earth's last aphelion
         # passage into the Wertz model. Then that is divided by the speed of light.
-        days_since_aphelion = (self.initial_jd_since_aphelion + time / 86400) % 365.25
-        irradiance = 1358 / (1.004 + 0.0334 * np.cos(2 * np.pi * days_since_aphelion)) * self.irradiance_scale_factor
+        days_since_aphelion = (self._initial_jd_since_aphelion + time / 86400) % 365.25
+        irradiance = 1358 / (1.004 + 0.0334 * np.cos(2 * np.pi * days_since_aphelion)) * self._irradiance_scale_factor
         solar_pressure = irradiance / speed_of_light
 
         # Perform a check to see if the satellite is in the Earth's shadow. First check if the cosine of the angle
@@ -156,7 +148,7 @@ class SolarRadiation(base.Perturbation):
         # satellite lies in the Earth's shade cylinder. This can be done by finding the component of the satellite's
         # position perpendicular to the Earth-Sun line and checking to see if it's magnitude is less than the radius of
         # the cylinder (which is equivalent to Earth's radius).
-        if self.shadowing:
+        if self._shadowing:
             position_sun_wrt_earth = -position_earth_wrt_sun
             sun_angle_check = (
                     np.dot(position_sun_wrt_earth, state[:3])

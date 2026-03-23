@@ -2,12 +2,14 @@ from __future__ import annotations
 import copy
 import concurrent.futures
 from typing import Optional
+import pickle
+import time as python_time
 
 import pandas as pd
 import numpy as np
 
 from . import propagation, perturbations, time, logging, spacecraft
-from ..ui import rendering
+from ..viewer import viewing
 
 
 class Mission:
@@ -35,6 +37,8 @@ class Mission:
     perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
         Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are added
         a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
+    verbose: bool
+        Whether to print information about propagation.
     cores : int
         How many cores to use propagation. If this is greater than 1 parallel computing will be enabled.
 
@@ -42,20 +46,7 @@ class Mission:
     ----------
     satellites : dict[str, :class:`~hohmannpy.astro.Satellite`]
         Dictionary of satellites created using the ``name`` parameter of each ``Satellite`` as the key and the object
-        itself as the value.
-    initial_global_time : :class:`~hohmannpy.astro.Time`
-        The Gregorian date and UT1 time to start the mission at.
-    final_global_time : :class:`~hohmannpy.astro.Time`
-        The Gregorian date and UT1 time to end the mission at.
-    propagator : :class:`~hohmannpy.astro.Propagator`
-        Propagation technique to use to simulate the orbits of each ``Satellite``. If none was passed during
-        initialization, it will default to :class:`~hohmannpy.astro.UniversalVariablePropagator` unless any
-        ``Perturbation`` in which case a ``CowellPropagator`` will be used.
-    perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
-        Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are added
-        a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
-    cores : int
-        How many cores to use propagation. If this is greater than 1 parallel computing will be enabled.
+        itself as the value. All data post-propagation regarding each satellite is stored here.
     """
 
     def __init__(
@@ -66,27 +57,28 @@ class Mission:
             loggers: Optional[list[logging.Logger]] = None,
             propagator: Optional[propagation.base.Propagator] = None,
             perturbing_forces: Optional[list[perturbations.Perturbation]] = None,
+            verbose: bool = True,
             cores: int = 1
     ):
         # Instantiate all the passed-in attributes.
-        self.perturbing_forces: list[perturbations.Perturbation] = perturbing_forces
-        self.initial_global_time: time.Time = initial_global_time
-        self.final_global_time: time.Time = final_global_time
-        self.global_time: time.Time = initial_global_time
-        self.cores: int = cores
+        self._perturbing_forces: list[perturbations.Perturbation] = perturbing_forces
+        self._initial_global_time: time.Time = initial_global_time
+        self._final_global_time: time.Time = final_global_time
+        self._verbose: bool = verbose
+        self._cores: int = cores
 
         # If the user did not pass in a propagator we need to assign one for them. If no perturbations are used we can
         # use the best-in-class Keplerian propagator, UniversalVariablePropagator(). If a perturbation is used instead
         # use CowellPropagator() to account for non-Keplerian effects.
         if propagator is None:
-            if perturbing_forces is None:
-                self.propagator: propagation.base.Propagator = (
+            if self._perturbing_forces is None:
+                self._propagator: propagation.base.Propagator = (
                     propagation.universal_variable.UniversalVariablePropagator()
                 )
             else:
-                self.propagator: propagation.base.Propagator = propagation.cowell.CowellPropagator()
+                self._propagator: propagation.base.Propagator = propagation.cowell.CowellPropagator()
         else:
-            self.propagator: propagation.base.Propagator = propagator
+            self._propagator: propagation.base.Propagator = propagator
 
         # If the user did not pass in a logger default to recording the time and state.
         if loggers is None:
@@ -125,11 +117,11 @@ class Mission:
                     raise ValueError("Burns may only be scheduled for after the start of the mission.")
 
                 # Safeguard to ensure Keplerian propagators are not used with continuous.rst burns.
-                if ((isinstance(self.propagator, propagation.KeplerPropagator) or
-                    isinstance(self.propagator, propagation.UniversalVariablePropagator))
-                    and not isinstance(self.propagator, propagation.EnckePropagator)
+                if ((isinstance(self._propagator, propagation.KeplerPropagator) or
+                     isinstance(self._propagator, propagation.UniversalVariablePropagator))
+                    and not isinstance(self._propagator, propagation.EnckePropagator)
                 ):
-                    raise TypeError(f"Propagators of type {self.propagator} are not supported for maneuvers of type "
+                    raise TypeError(f"Propagators of type {self._propagator} are not supported for maneuvers of type "
                                     f"ContinuousBurn.")
 
                 # Safeguard to make sure all satellites have mass attributes.
@@ -144,8 +136,8 @@ class Mission:
             # There are a bunch of optional parameters for each satellite only needed for specific perturbations. We
             # want to make sure that if a perturbation is enabled that the user has input value for all the needed
             # optional parameters for each satellite.
-            if self.perturbing_forces is not None:
-                for perturbation in self.perturbing_forces:
+            if self._perturbing_forces is not None:
+                for perturbation in self._perturbing_forces:
                     if isinstance(perturbation, perturbations.AtmosphericDrag) and satellite.ballistic_coeff is None:
                         raise AttributeError("If AtmosphericDrag is enabled as a perturbation all satellites must have "
                                              "a value for the attribute 'ballistic coefficient'.")
@@ -161,14 +153,18 @@ class Mission:
 
         # Perform some QOL assignment of Perturbation object attributes based on the initial and final global times so
         # the user doesn't have to redundantly pass these to both the Mission and these object's __init__()s.
-        if self.perturbing_forces is not None:
-            for perturbation in self.perturbing_forces:
+        if self._perturbing_forces is not None:
+            for perturbation in self._perturbing_forces:
                 if isinstance(perturbation, perturbations.SolarRadiation):
-                    perturbation.finalize__init__(self.initial_global_time, self.final_global_time)
+                    perturbation._finalize__init__(self._initial_global_time, self._final_global_time)
                 if isinstance(perturbation, perturbations.NonSphericalEarth):
-                    perturbation.finalize__init__(self.initial_global_time.gmst)
+                    perturbation._finalize__init__(self._initial_global_time.gmst)
+                if isinstance(perturbation, perturbations.J2):
+                    perturbation._finalize__init__(self._initial_global_time.gmst)
+                if isinstance(perturbation, perturbations.AtmosphericDrag):
+                    perturbation._finalize__init__(self._initial_global_time.gmst)
                 if isinstance(perturbation, perturbations.ThirdBodyGravity):
-                    perturbation.finalize__init__(self.initial_global_time, self.final_global_time)
+                    perturbation._finalize__init__(self._initial_global_time, self._final_global_time)
 
     def simulate(self):
         r"""
@@ -177,15 +173,26 @@ class Mission:
         This also contains all the parallel computing logic.
         """
 
+        if self._verbose:
+            print("Propagating...\n")
+            start_time = python_time.perf_counter()
+
         # Propagation uses units of seconds, so convert Gregorian/UT1 -> Julian Date -> seconds.
-        runtime = (self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400
+        runtime = (self._final_global_time.julian_date - self._initial_global_time.julian_date) * 86400
+
+        if self._verbose:
+            print(f"Satellites: {len(list(self.satellites))}")
+            print(f"Algorithm: \t{self._propagator.name}")
 
         # Single core case.
-        if self.cores == 1:
-            self.propagator.propagate(
+        if self._cores == 1:
+            if self._verbose:
+                print(f"Multicore: \tFalse")
+
+            self._propagator._propagate(
                 satellites=self.satellites,
                 runtime=runtime,
-                perturbing_forces=self.perturbing_forces,
+                perturbing_forces=self._perturbing_forces,
             )
 
         # Multicore case. First, calculate how many satellites should be distributed to each core. These are then split
@@ -196,32 +203,50 @@ class Mission:
         # as the satellites to propagate from core_group. After propagation these satellites are and remerged with the
         # main satellites dict.
         else:
-            satellites_per_core = int(np.floor(len(self.satellites.items()) / self.cores))
+            satellites_per_core = int(np.floor(len(self.satellites.items()) / self._cores))
             if satellites_per_core == 0:  # Make sure there aren't more cores than satellites.
                 raise ValueError("If M cores are assigned there must be N satellites to simulate, where N >= M.")
 
             # Create the core groups.
             core_group = {}
             core_groups = []
+            core_group_ids = []
+
+            i = 1
             for name, satellite in self.satellites.items():
                 core_group[name] = satellite
 
                 # Distribute satellites to core_group until satellites_per_core is reached then move to the next group.
                 if len(core_group) == satellites_per_core:
                     core_groups.append(core_group.copy())
+                    core_group_ids.append(i)
                     core_group = {}
+
+                    i += 1
+
             if core_group:
                 core_groups.append(core_group.copy())
+                core_group_ids.append(i)
+
+            if self._verbose:
+                print(f"Multicore: \tTrue")
+                print(f"Cores: \t\t{self._cores}")
+                print(f"Sat/Core: \t{len(core_groups[0])}\n")
 
             # Execute the actual multiprocessing. This calls a helper function _parallel_propagate() which actually sets
             # up a clone of the passed in Propagator for parallel processing.
-            with concurrent.futures.ProcessPoolExecutor(max_workers=self.cores) as executor:
+            with concurrent.futures.ProcessPoolExecutor(max_workers=self._cores) as executor:
                 for core_group in executor.map(
                         Mission._parallel_propagate,
-                        [(self.propagator, core_group, runtime, self.perturbing_forces) for core_group in core_groups]
+                        [(self._propagator, core_group, group_id, runtime, self._perturbing_forces, self._verbose) for core_group, group_id in zip(core_groups, core_group_ids)]
                 ):
                     for name, satellite in core_group.items():  # Update satellites after propagation.
                         self.satellites[name] = satellite
+
+        end_time = python_time.perf_counter()
+
+        if self._verbose:
+            print(f"\nPropagation complete in {end_time - start_time:.2f} seconds!")
 
     @staticmethod
     def _parallel_propagate(args: tuple[propagation.Propagator, dict[str, spacecraft.Satellite], float, list[perturbations.Perturbation]]) -> None:
@@ -233,7 +258,7 @@ class Mission:
 
         Parameters
         ----------
-        args : tuple[:class:`~hohmannpy.astro.Propagator`, dict[str, :class:`~hohmannpy.astro.Spacecraft], float, list[:class:~hohmannpy.astro.Perturbation`]
+        args : tuple[:class:`~hohmannpy.astro.Propagator`, dict[str, :class:`~hohmannpy.astro.Spacecraft], int, float, list[:class:~hohmannpy.astro.Perturbation`, bool]
             Tuple of arguments needed to start propagation on a core. These include the propagator itself, a ``dict`` of
             the satellites to propagate, how long to propagate for, and any perturbations.
 
@@ -243,49 +268,37 @@ class Mission:
             Propagated satellites to now reintegrate with the main ``satellite`` dict.
         """
 
-        propagator, satellites, runtime, perturbing_forces = args
-        propagator.propagate(
+        propagator, satellites, group_id, runtime, perturbing_forces, verbose = args
+        propagator._propagate(
             satellites=satellites,
             runtime=runtime,
             perturbing_forces=perturbing_forces,
         )
 
+        if verbose:
+            print(f"Core {group_id} done")
+
         return satellites
 
-    def display(self, display_flag = "dynamic"):
+    def display(self):
         r"""
-        Display the orbits of all satellites using :class:`~hohmannpy.ui.RenderEngine` or
-        :class:`~hohmannpy.ui.DynamicRenderEngine`.
+        Display the orbits of all satellites using a Qt application.
 
         This should only be called after ``simulate()`` is run.
-
-        Parameters
-        ----------
-        display_flag : str
-            Flag which indicates what type of rendering to use for the mission. If set to "dynamic" a real-time
-            rendering will launch. Otherwise, a static rendering will be used.
         """
 
-        if display_flag == "dynamic-groundtracks.rst":
-            engine = rendering.DynamicRenderEngine(
-                satellites=self.satellites,
-                runtime=(self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400,
-                initial_global_time=self.initial_global_time,
-                draw_groundtracks=True
-            )
-        elif display_flag == "dynamic":
-            engine = rendering.DynamicRenderEngine(
-                satellites=self.satellites,
-                runtime=(self.final_global_time.julian_date - self.initial_global_time.julian_date) * 86400,
-                initial_global_time=self.initial_global_time,
-                draw_groundtracks=False
-            )
-        else:
-            engine = rendering.RenderEngine(
-                satellites=self.satellites,
-            )
+        # Check to make sure trajectories were logged.
+        loggers = next(iter(self.satellites.values())).loggers
+        if not any(isinstance(logger, logging.StateLogger) for logger in loggers):
+            raise AttributeError("No StateLogger stored for this mission, can not generate trajectories for display.")
 
-        engine.render()  # Command which actually launches the graphical application.
+        sim_manager = viewing.ViewerManager(
+            self.satellites,
+            self._initial_global_time,
+            self._final_global_time,
+            self._propagator._step_size
+        )
+        sim_manager.run()
 
     def to_csv(self, target_directory: str, fp_accuracy: int):
         r"""
@@ -327,3 +340,18 @@ class Mission:
                 index=False,
                 float_format=f"%.{fp_accuracy}f"
             )
+
+    def save(self, name: str, target_directory: str):
+        r"""
+        Pickle the ``Mission`` so that it may be loaded later.
+
+         Parameters
+        ----------
+        name : str
+            Name of the pickled ``Mission``.
+        target_directory : str
+            The folder path to store the pickled ``Mission`` in.
+        """
+
+        with open(f"{target_directory}/{name}.pkl", "wb") as f:
+            pickle.dump(self, f)

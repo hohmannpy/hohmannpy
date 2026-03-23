@@ -219,18 +219,18 @@ class Orbit:
 
         # Store/compute orbital elements. Manually call update functions because update_all() would overwrite some
         # elements passed in by the user.
-        orbit.update_spf_angular_momentum()
-        orbit.update_eccentricity()
-        orbit.update_nodal_vec()
-        orbit.update_sl_rectum()
+        orbit._update_spf_angular_momentum()
+        orbit._update_eccentricity()
+        orbit._update_nodal_vec()
+        orbit._update_sl_rectum()
         orbit.sm_axis = sm_axis
         orbit.raan = raan
         orbit.inclination = inclination
         orbit.argp = argp
         orbit.true_anomaly = true_anomaly
-        orbit.update_longp()
-        orbit.update_argl()
-        orbit.update_true_latitude()
+        orbit._update_longp()
+        orbit._update_argl()
+        orbit._update_true_latitude()
 
         if track_equinoctial:
             orbit.update_equinoctial()
@@ -292,18 +292,18 @@ class Orbit:
 
         # Store/compute orbital elements. Manually call update functions because update_all() would overwrite some
         # elements passed in by the user.
-        orbit.update_spf_angular_momentum()
-        orbit.update_eccentricity()
-        orbit.update_nodal_vec()
+        orbit._update_spf_angular_momentum()
+        orbit._update_eccentricity()
+        orbit._update_nodal_vec()
         orbit.sl_rectum = sl_rectum
         orbit.sm_axis = np.inf
         orbit.raan = raan
         orbit.inclination = inclination
         orbit.argp = argp
         orbit.true_anomaly = true_anomaly
-        orbit.update_longp()
-        orbit.update_argl()
-        orbit.update_true_latitude()
+        orbit._update_longp()
+        orbit._update_argl()
+        orbit._update_true_latitude()
 
         if track_equinoctial:
             orbit.update_equinoctial()
@@ -365,17 +365,17 @@ class Orbit:
 
         # Store/compute orbital elements. Manually call update functions because update_all() would overwrite some
         # elements passed in by the user.
-        orbit.update_spf_angular_momentum()
-        orbit.update_eccentricity()
-        orbit.update_nodal_vec()
+        orbit._update_spf_angular_momentum()
+        orbit._update_eccentricity()
+        orbit._update_nodal_vec()
         orbit.sl_rectum = sl_rectum
-        orbit.update_sm_axis()
-        orbit.update_raan()
-        orbit.update_inclination()
-        orbit.update_argp()
-        orbit.update_true_anomaly()
-        orbit.update_longp()
-        orbit.update_argl()
+        orbit._update_sm_axis()
+        orbit._update_raan()
+        orbit._update_inclination()
+        orbit._update_argp()
+        orbit._update_true_anomaly()
+        orbit._update_longp()
+        orbit._update_argl()
         orbit.true_latitude = true_latitude
 
         if track_equinoctial:
@@ -549,7 +549,7 @@ class Orbit:
         # solve them in which a value for the Stumpff parameter is guessed, all three equations are solved and then
         # these are plugged into Kepler's equation where time is set equal to the time-of-flight.
         def eq(x):
-            s_func, c_func = uv_propagator.stumpff_funcs(x)
+            s_func, c_func = uv_propagator._stumpff_funcs(x)
             lambert_param = (
                     np.linalg.norm(position1) + np.linalg.norm(position2)
                         - lambert_const * (1 - x * s_func) / np.sqrt(c_func)
@@ -563,7 +563,7 @@ class Orbit:
         stumpff_param = sp.optimize.newton(eq, 0, tol=solver_tol)
 
         # Compute the f and g functions from the resultant change in the Stumpff parameter.
-        s_func, c_func = uv_propagator.stumpff_funcs(stumpff_param)
+        s_func, c_func = uv_propagator._stumpff_funcs(stumpff_param)
         lambert_param = (
                 np.linalg.norm(position1) + np.linalg.norm(position2)
                 - lambert_const * (1 - stumpff_param * s_func) / np.sqrt(c_func)
@@ -601,27 +601,27 @@ class Orbit:
     # ORBITAL ELEMENT UPDATE METHODS
     # ------------------------------
     # NOTE: Unless you know what you are doing just call update_classical() because the order these are run in matters.
-    def update_spf_angular_momentum(self):
+    def _update_spf_angular_momentum(self):
         self.spf_angular_momentum = np.cross(self.position, self.velocity)
 
-    def update_eccentricity(self):  # This one updates eccentricity and eccentricity vector.
+    def _update_eccentricity(self):  # This one updates eccentricity and eccentricity vector.
         self.eccentricity_vec = (
                 np.cross(self.velocity, self.spf_angular_momentum)
                 / self.grav_param - self.position / np.linalg.norm(self.position)
         )
         self.eccentricity = np.linalg.norm(self.eccentricity_vec)
 
-    def update_nodal_vec(self):
+    def _update_nodal_vec(self):
         unit_vec_3 = np.array([0, 0, 1])
         self.nodal_vec = np.cross(unit_vec_3, self.spf_angular_momentum)
 
-    def update_sl_rectum(self):
+    def _update_sl_rectum(self):
         self.sl_rectum = np.linalg.norm(self.spf_angular_momentum) ** 2 / self.grav_param
 
-    def update_sm_axis(self):
+    def _update_sm_axis(self):
         self.sm_axis = self.sl_rectum / (1 - self.eccentricity ** 2)
 
-    def update_raan(self):
+    def _update_raan(self):
         unit_vec_1 = np.array([1, 0, 0])
         unit_vec_2 = np.array([0, 1, 0])
         raan = np.arctan2(
@@ -632,14 +632,14 @@ class Orbit:
             raan += 2 * np.pi
         self.raan = raan
 
-    def update_inclination(self):
+    def _update_inclination(self):
         unit_vec_3 = np.array([0, 0, 1])
         self.inclination = np.arctan2(
             np.dot(self.spf_angular_momentum, np.cross(self.nodal_vec, unit_vec_3)),
             np.linalg.norm(self.nodal_vec) * np.dot(self.spf_angular_momentum, unit_vec_3)
         )
 
-    def update_argp(self):
+    def _update_argp(self):
         argp = np.arctan2(
             np.dot(self.eccentricity_vec, np.cross(self.spf_angular_momentum, self.nodal_vec)),
             np.linalg.norm(self.spf_angular_momentum) * np.dot(self.eccentricity_vec, self.nodal_vec)
@@ -648,19 +648,19 @@ class Orbit:
             argp += 2 * np.pi
         self.argp = argp
 
-    def update_e_component1(self):
+    def _update_e_component1(self):
         self.e_component1 = self.eccentricity * np.cos(self.argp + self.raan)
 
-    def update_e_component2(self):
+    def _update_e_component2(self):
         self.e_component2 = self.eccentricity * np.sin(self.argp + self.raan)
 
-    def update_n_component1(self):
+    def _update_n_component1(self):
         self.n_component1 = np.tan(self.inclination / 2) * np.cos(self.raan)
 
-    def update_n_component2(self):
+    def _update_n_component2(self):
         self.n_component2 = np.tan(self.inclination / 2) * np.sin(self.raan)
 
-    def update_true_anomaly(self):
+    def _update_true_anomaly(self):
         true_anomaly = np.arctan2(
             np.dot(self.position, np.cross(self.spf_angular_momentum, self.eccentricity_vec)),
             np.linalg.norm(self.spf_angular_momentum) * np.dot(self.position, self.eccentricity_vec)
@@ -669,19 +669,19 @@ class Orbit:
             true_anomaly += 2 * np.pi
         self.true_anomaly = true_anomaly
 
-    def update_longp(self):
+    def _update_longp(self):
         longp = self.raan + self.argp
         if longp > 2 * np.pi: # Wrap to [0, 2pi]. No need for < 0 wrapping since other angles are already wrapped.
             longp %= 2 * np.pi
         self.longp = longp
 
-    def update_argl(self):
+    def _update_argl(self):
         argl = self.argp + self.true_anomaly
         if argl > 2 * np.pi: # Wrap to [0, 2pi]. No need for < 0 wrapping since other angles are already wrapped.
             argl %= 2 * np.pi
         self.argl = argl
 
-    def update_true_latitude(self):
+    def _update_true_latitude(self):
         true_latitude = self.raan + self.argp + self.true_anomaly
         if true_latitude > 2 * np.pi: # Wrap to [0, 2pi]. No need for < 0 wrapping since other angles are already wrapped.
             true_latitude %= 2 * np.pi
@@ -694,18 +694,18 @@ class Orbit:
         velocity.
         """
 
-        self.update_spf_angular_momentum()
-        self.update_eccentricity()
-        self.update_nodal_vec()
-        self.update_sl_rectum()
-        self.update_sm_axis()
-        self.update_raan()
-        self.update_inclination()
-        self.update_argp()
-        self.update_true_anomaly()
-        self.update_longp()
-        self.update_argl()
-        self.update_true_latitude()
+        self._update_spf_angular_momentum()
+        self._update_eccentricity()
+        self._update_nodal_vec()
+        self._update_sl_rectum()
+        self._update_sm_axis()
+        self._update_raan()
+        self._update_inclination()
+        self._update_argp()
+        self._update_true_anomaly()
+        self._update_longp()
+        self._update_argl()
+        self._update_true_latitude()
 
     def update_equinoctial(self):
         """
@@ -714,7 +714,7 @@ class Orbit:
         ``update_classical()``.
         """
 
-        self.update_e_component1()
-        self.update_e_component2()
-        self.update_n_component1()
-        self.update_n_component2()
+        self._update_e_component1()
+        self._update_e_component2()
+        self._update_n_component1()
+        self._update_n_component2()

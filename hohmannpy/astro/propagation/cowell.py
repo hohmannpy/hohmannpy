@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from .. import spacecraft, perturbations
 
 
-# TODO: Investigating implementing functools.cache for Taylor series.
 class CowellPropagator(base.Propagator):
     r"""
     Simplest non-Keplerian propagate which numerically integrates the equations of motion of a satellite using a
@@ -24,13 +23,9 @@ class CowellPropagator(base.Propagator):
     step_size : float
         Time interval between propagation steps. If one is not provided by the user it will be set in
         :meth:`propagate()` to 60 :math:`s`.
-
-    Attributes
-    ----------
-    step_size : float
-        Time interval between propagation steps. If one is not provided by the user it will be set in
-        :meth:`propagate()` to 60 :math:`s`.
     """
+
+    name = "Cowell"
 
     def __init__(
             self,
@@ -38,7 +33,7 @@ class CowellPropagator(base.Propagator):
     ):
         super().__init__(step_size)
 
-    def propagate(
+    def _propagate(
             self,
             satellites: dict[str, spacecraft.Satellite],
             runtime: float,
@@ -58,23 +53,23 @@ class CowellPropagator(base.Propagator):
             Perturbations to add to the mission to increase the fidelity of orbital simulation.
         """
 
-        super().propagate(satellites, runtime, perturbing_forces)
+        super()._propagate(satellites, runtime, perturbing_forces)
 
         # Get initial values used for propagation and set up logging capabilities.
-        for name, satellite in self.satellites.items():
+        for name, satellite in self._satellites.items():
             # Setup the loggers.
             burns = len(satellite.impulsive_burns) + len(satellite.continuous_burns)
 
             for logger in satellite.loggers:
-                logger.setup(initial_orbit=satellite.orbit, timesteps=self.timesteps, burns=burns)
+                logger.setup(initial_orbit=satellite.orbit, timesteps=self._timesteps, burns=burns)
 
         # Begin the actual propagation loop. This is made of two loops: timesteps (outer), satellites (inner).
         # This involves a lot of logic surrounding burns which boils down to just determining when to call step(). The
         # steps taken (for a given satellite on a given timestep) are as follows:
         #   1) Set the next "standard time" of propagation to be the current time + timestep.
         #   2) Start a true loop that iterates through all events scheduled between the current time and the next
-        #       "standard time". An event can be one of three things: an impulsive burn, a continuous.rst burn starting, or
-        #       a continuous.rst burn ending.
+        #       "standard time". An event can be one of three things: an impulsive burn, a continuous burn starting, or
+        #       a continuous burn ending.
         #   3) For each of these event types, determine when the next will occur (if any). Then, out of these determine
         #       which event will occur next.
         #   4) For each iteration of the loop, take a mini-timestep from the current time to the time of the next event.
@@ -87,16 +82,16 @@ class CowellPropagator(base.Propagator):
         #           i) Increment the satellite's continuous_burn_start_index by 1.
         #       Continuous burn end:
         #           i) Increment the satellite's continuous_burn_end_index by 1.
-        #       Note that the actual application acceleration due to the continuous.rst burn is handled independently of
+        #       Note that the actual application acceleration due to the continuous burn is handled independently of
         #       this loop by eom(). This loop simply ensures that the discrete time grid includes the exact times at
         #       which a continuous.rst burn starts and stops to prevent discontinuities in integration.
         #   6) Repeat 3-5 until all events scheduled before the next standard time are completed.
         #   7) Take a mini-timestep from the time of the last event till the next standard time. Then, propagate over
         #       this mini-timestep.
-        for timestep in range(1, self.timesteps + 1):
-            for name, satellite in self.satellites.items():
+        for timestep in range(1, self._timesteps + 1):
+            for name, satellite in self._satellites.items():
                 if satellite.impulsive_burns or satellite.continuous_burns:  # Skip this step if no burns are scheduled.
-                    next_std_time = satellite.orbit.time + self.step_size
+                    next_std_time = satellite.orbit.time + self._step_size
 
                     # Event loop.
                     while True:
@@ -138,34 +133,36 @@ class CowellPropagator(base.Propagator):
                         # the necessary logic.
                         if next_std_time >= next_event_time:
                             if event_type == "impulsive":
-                                self.step(name, satellite, next_event_time - satellite.orbit.time)
+                                self._step(name, satellite, next_event_time - satellite.orbit.time)
                                 impulsive_burn.evaluate(satellite)
                                 satellite.orbit.update_classical()
                                 if satellite.orbit.track_equinoctial:
                                     satellite.orbit.update_equinoctial()
-                                self.log(satellite)  # Log this data because it isn't logged in evaluate().
+                                self._log(satellite)  # Log this data because it isn't logged in evaluate().
                             elif event_type == "continuous_start":
-                                self.step(name, satellite, next_event_time - satellite.orbit.time)
+                                self._step(name, satellite, next_event_time - satellite.orbit.time)
                                 satellite.continuous_burn_start_index += 1  # No evaluate() so update index manually.
                             elif event_type == "continuous_end":
-                                self.step(name, satellite, next_event_time - satellite.orbit.time)
+                                self._step(name, satellite, next_event_time - satellite.orbit.time)
                                 satellite.continuous_burn_end_index += 1
                         else:
                             break
 
                     # After all events, increment to the next_std_time and perform normal propagation.
-                    self.step(name, satellite, next_std_time - satellite.orbit.time)
+                    self._step(name, satellite, next_std_time - satellite.orbit.time)
 
                 # No events, so simply propagate to next standard time.
                 else:
-                    self.step(name, satellite, self.step_size)
+                    self._step(name, satellite, self._step_size)
 
-    def step(self, satellite, time_change):
+    def _step(self, name, satellite, time_change):
         r"""
         One step in the propagation loop.
 
         Parameters
         ----------
+        name : str
+            Name of the satellite being propagated.
         satellite: :class:`~hohmannpy.astro.Satellite`
             Satellite being propagated. Holds the orbit to propagate as an attribute named ``orbit``.
         time_change : float
@@ -176,7 +173,7 @@ class CowellPropagator(base.Propagator):
         # RK4 integration of the satellite's EOM.
         orbit = satellite.orbit
 
-        state = self.rk4(
+        state = self._rk4(
             t0=orbit.time,
             delt=time_change,
             y0=np.concatenate((orbit.position, orbit.velocity)),
@@ -192,9 +189,9 @@ class CowellPropagator(base.Propagator):
             orbit.update_equinoctial()
 
         # Save results from this timestep.
-        self.log(satellite)
+        self._log(satellite)
 
-    def eom(
+    def _eom(
             self,
             t: float,
             y: np.ndarray,
@@ -236,15 +233,7 @@ class CowellPropagator(base.Propagator):
         y4_dot = -satellite.orbit.grav_param / radius ** 3 * y[1]
         y5_dot = -satellite.orbit.grav_param / radius ** 3 * y[2]
 
-        # Append perturbing forces.
-        if self.perturbing_forces is not None:
-            for perturbing_force in self.perturbing_forces:
-                y3_perturb, y4_perturb, y5_perturb = perturbing_force.evaluate(t, y, satellite)
-                y3_dot += y3_perturb
-                y4_dot += y4_perturb
-                y5_dot += y5_perturb
-
-        # Append active continuous.rst burns.
+        # Append active continuous burns. Do these first because they can change masses.
         for burn in satellite.continuous_burns:
             if burn.start_time <= t <= burn.end_time:  # Check if burn is active.
                 y3_perturb, y4_perturb, y5_perturb = burn.evaluate(t, y, satellite)
@@ -252,9 +241,17 @@ class CowellPropagator(base.Propagator):
                 y4_dot += y4_perturb
                 y5_dot += y5_perturb
 
+        # Append perturbing forces.
+        if self._perturbing_forces is not None:
+            for perturbing_force in self._perturbing_forces:
+                y3_perturb, y4_perturb, y5_perturb = perturbing_force.evaluate(t, y, satellite)
+                y3_dot += y3_perturb
+                y4_dot += y4_perturb
+                y5_dot += y5_perturb
+
         return np.array([y0_dot, y1_dot, y2_dot, y3_dot, y4_dot, y5_dot])
 
-    def rk4(
+    def _rk4(
             self,
             t0: float,
             y0: np.ndarray,
@@ -282,9 +279,9 @@ class CowellPropagator(base.Propagator):
             Approximated state at time t0 + step_size.
         """
 
-        x1 = self.eom(t0, y0, satellite)
-        x2 = self.eom(t0 + delt / 2, y0 + delt / 2 * x1, satellite)
-        x3 = self.eom(t0 + delt / 2, y0 + delt / 2 * x2, satellite)
-        x4 = self.eom(t0 + delt, y0 + delt * x3, satellite)
+        x1 = self._eom(t0, y0, satellite)
+        x2 = self._eom(t0 + delt / 2, y0 + delt / 2 * x1, satellite)
+        x3 = self._eom(t0 + delt / 2, y0 + delt / 2 * x2, satellite)
+        x4 = self._eom(t0 + delt, y0 + delt * x3, satellite)
 
         return y0 + delt / 6 * (x1 + 2 * x2 + 2 * x3 + x4)

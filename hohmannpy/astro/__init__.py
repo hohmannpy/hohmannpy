@@ -28,7 +28,7 @@ from .logging import (
 # Other libraries
 from .mission import Mission
 from .spacecraft import Satellite, Earth, Moon
-from .orbit import Orbit
+from .orbits import Orbit
 from .time import Time
 from .groundtracks import Groundtrack
 from .maneuvers import (

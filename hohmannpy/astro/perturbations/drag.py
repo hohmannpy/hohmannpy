@@ -22,26 +22,11 @@ class AtmosphericDrag(base.Perturbation):
 
     Parameters
     ----------
-    initial_gmst : float
-        Current angle of the Greenwich meridian in radians.
     solar_activity : str
         Which CIRA-12 reference atmosphere model to use for the density. Can select between "low", "medium", and "high".
         See the CIRA-12 offical report [1]_ for more details on how to select between these.
     solver_tol : float
         Tolerance to use when solving for the geodetic latitude via fixed-point iteration.
-
-    Attributes
-    ----------
-    initial_gmst : float
-        Initial angle of the Greenwich meridian in :math:`rad` when propagation began.
-    solver_tol : float
-        Tolerance to use when solving for the geodetic latitude via fixed-point iteration.
-    densities : scipy.BSpline
-        Piece-wise linear spline generated from a density curve where the independent variable is altitudes in
-        :math:`km` and the dependent variable is densities in :math:`kg/m^3`.
-    exosphere_bound : float
-        Upper limit of the exosphere in :math:`km` above which the density is assumed to be zero and hence there is no
-        drag.
 
     Notes
     -----
@@ -67,20 +52,19 @@ class AtmosphericDrag(base.Perturbation):
 
     def __init__(
             self,
-            initial_gmst: float,
             solar_activity: str = "moderate",
             solver_tol: float = 1e-8
     ):
         super().__init__()
 
-        self.initial_gmst = initial_gmst
-        self.solver_tol = solver_tol
+        self._initial_gmst = None
+        self._solver_tol = solver_tol
 
         # Import the density table to use based on the chosen solar and geomagnetic activity level.
         if solar_activity == "low":
             with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_low_activity.csv").open() as f:
                 density_curve = np.loadtxt(f, delimiter=",")  # altitude (km), density (kg/m^3)
-                self.densities = sp.interpolate.make_interp_spline(
+                self._densities = sp.interpolate.make_interp_spline(
                     density_curve[:, 0].squeeze(),
                     density_curve[:, 1].squeeze(),
                     k=3
@@ -88,7 +72,7 @@ class AtmosphericDrag(base.Perturbation):
         elif solar_activity == "moderate":
             with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_moderate_activity.csv").open() as f:
                 density_curve = np.loadtxt(f, delimiter=",")  # altitude (km), density (kg/m^3)
-                self.densities = sp.interpolate.make_interp_spline(
+                self._densities = sp.interpolate.make_interp_spline(
                     density_curve[:, 0].squeeze(),
                     density_curve[:, 1].squeeze(),
                     k=3
@@ -96,7 +80,7 @@ class AtmosphericDrag(base.Perturbation):
         elif solar_activity == "high":
             with importlib.resources.files("hohmannpy.resources").joinpath("cira_12_high_activity.csv").open() as f:
                 density_curve = np.loadtxt(f, delimiter=",")  # altitude (km), density (kg/m^3)
-                self.densities = sp.interpolate.make_interp_spline(
+                self._densities = sp.interpolate.make_interp_spline(
                     density_curve[:, 0].squeeze(),
                     density_curve[:, 1].squeeze(),
                     k=3
@@ -104,7 +88,22 @@ class AtmosphericDrag(base.Perturbation):
         else:
             raise ValueError(f"{solar_activity} is not a valid setting for the solar activity, please choose from "
                              f"'low', 'medium', or 'high'.")
-        self.exosphere_bound = density_curve[-1, 0]
+        self._exosphere_bound = density_curve[-1, 0]
+
+    def _finalize__init__(self, initial_gmst: float):
+        """
+        Record the initial GMST of the Earth which is used to correctly orient it for geopotential modeling.
+
+        This is needed by :meth:`evaluate()` but can't be passed to the base ``__init__()``. This is called during
+        :class:`~hohmannpy.astro.Mission`'s instantiation.
+
+        Parameters
+        ----------
+        initial_gmst : float
+            Initial angle of the Greenwich meridian in :math:`rad`.
+        """
+
+        self._initial_gmst = initial_gmst
 
     def evaluate(self, time: float, state: np.ndarray, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""
@@ -128,19 +127,19 @@ class AtmosphericDrag(base.Perturbation):
         earth_rot = 7.292115e-5  # Mean rotation rate of the Earth in radians.
 
         # Update GMST using simplified precession-free rotation of the Earth.
-        gmst = self.initial_gmst + earth_rot * time
+        gmst = self._initial_gmst + earth_rot * time
 
         # Transform position to the Earth-centered-Earth-fixed frame and then compute the geodetic altitude.
         inertial_2_earth_dcm = dcms.euler_2_dcm(gmst, 3)
         position = inertial_2_earth_dcm @ state[:3]
-        altitude = self.compute_altitude(position)
+        altitude = self._compute_altitude(position)
 
         # If above the exosphere_bound, there is effectively no atmosphere.
-        if altitude / 1000 > self.exosphere_bound:
+        if altitude / 1000 > self._exosphere_bound:
             return np.array([0, 0, 0])
 
         # Compute density.
-        density = self.densities(altitude / 1000)  # Need to convert m -> km
+        density = self._densities(altitude / 1000)  # Need to convert m -> km
 
         # Compute the velocity of the satellite wrt. the atmosphere.
         velocity = state[3:] - np.cross(np.array([0, 0, earth_rot]), state[:3])
@@ -150,7 +149,7 @@ class AtmosphericDrag(base.Perturbation):
 
         return acceleration
 
-    def compute_altitude(self, position: np.ndarray) -> float:
+    def _compute_altitude(self, position: np.ndarray) -> float:
         """
         Compute the altitude above the surface of an ellipsoid Earth.
 
@@ -174,7 +173,7 @@ class AtmosphericDrag(base.Perturbation):
         x = np.arctan2(position[2], np.sqrt(position[0] ** 2 + position[1] ** 2))  # Initial guess.
         x_old = 100  # Dummy value to ensure error is initially above tolerance.
 
-        while abs(x - x_old) > self.solver_tol:  # Fixed point iteration.
+        while abs(x - x_old) > self._solver_tol:  # Fixed point iteration.
             x_old = x
             radius_of_curvature = earth_radius / np.sqrt((1 - earth_eccentricity ** 2 * np.sin(x) ** 2))
             x = np.arctan2(
