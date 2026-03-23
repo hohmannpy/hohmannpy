@@ -345,7 +345,7 @@ class Mission:
         r"""
         Pickle the ``Mission`` so that it may be loaded later.
 
-         Parameters
+        Parameters
         ----------
         name : str
             Name of the pickled ``Mission``.
