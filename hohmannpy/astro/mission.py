@@ -8,7 +8,7 @@ import time as python_time
 import pandas as pd
 import numpy as np
 
-from . import propagation, perturbations, time, logging, spacecraft
+from . import propagation, perturbations, time, logging, spacecraft, maneuvers
 from ..viewer import viewing
 
 
@@ -96,42 +96,42 @@ class Mission:
             # determined by Time objects, we now convert those to relative seconds since mission start. This couldn't be
             # done sooner because when the Burn objects were created the start time of the mission may not have been
             # known.
-            for burn in satellite.impulsive_burns:
-                if isinstance(burn.start_time, time.Time):
-                    burn.start_time = (burn.start_time.julian_date - initial_global_time.julian_date) * 86400
+            for event in satellite._events:
+                if isinstance(event[2], maneuvers.ImpulsiveBurn):
+                    if isinstance(event[2].start_time, time.Time):
+                        event[2].start_time = (event[2].start_time.julian_date - initial_global_time.julian_date) * 86400
 
-                # Safeguard to make sure burn happens after mission start.
-                if burn.start_time < 0:
-                    raise ValueError("Burns may only be scheduled for after the start of the mission.")
+                        # Safeguard to make sure burn happens after mission start.
+                        if event[2].start_time < 0:
+                            raise ValueError("Burns may only be scheduled for after the start of the mission.")
 
-            satellite.impulsive_burns.sort(key=lambda x: x.start_time)  # Sort from earliest to latest.
+                elif isinstance(event[2], maneuvers.ContinuousBurn):
+                    if isinstance(event[2].start_time, time.Time):
+                        event[2].start_time = (event[2].start_time.julian_date - initial_global_time.julian_date) * 86400
+                    if isinstance(event[2].end_time, time.Time):
+                        event[2].end_time = (event[2].end_time.julian_date - initial_global_time.julian_date) * 86400
 
-            for burn in satellite.continuous_burns:
-                if isinstance(burn.start_time, time.Time):
-                    burn.start_time = (burn.start_time.julian_date - initial_global_time.julian_date) * 86400
-                if isinstance(burn.end_time,  time.Time):
-                    burn.end_time = (burn.end_time.julian_date - initial_global_time.julian_date) * 86400
+                        # Safeguard to ensure Keplerian propagators are not used with continuous.rst burns.
+                        if ((isinstance(self._propagator, propagation.KeplerPropagator) or
+                             isinstance(self._propagator, propagation.UniversalVariablePropagator))
+                                and not isinstance(self._propagator, propagation.EnckePropagator)
+                        ):
+                            raise TypeError(
+                                f"Propagators of type {self._propagator} are not supported for maneuvers of type "
+                                f"ContinuousBurn.")
 
-                # Safeguard to make sure burn happens after mission start.
-                if burn.start_time < 0:
-                    raise ValueError("Burns may only be scheduled for after the start of the mission.")
+                        # Safeguard to make sure all satellites have mass attributes.
+                        if satellite.mass is None and event[2].masses is None:
+                            raise AttributeError(
+                                "If a ContinuousBurn is scheduled this satellites must have a value for the "
+                                "attribute 'mass' or the burn must have an accompanying mass curve via the "
+                                "'masses' attribute.")
 
-                # Safeguard to ensure Keplerian propagators are not used with continuous.rst burns.
-                if ((isinstance(self._propagator, propagation.KeplerPropagator) or
-                     isinstance(self._propagator, propagation.UniversalVariablePropagator))
-                    and not isinstance(self._propagator, propagation.EnckePropagator)
-                ):
-                    raise TypeError(f"Propagators of type {self._propagator} are not supported for maneuvers of type "
-                                    f"ContinuousBurn.")
+                        # Safeguard to make sure burn happens after mission start.
+                        if event[2].start_time < 0:
+                            raise ValueError("Burns may only be scheduled for after the start of the mission.")
 
-                # Safeguard to make sure all satellites have mass attributes.
-                if satellite.mass is None:
-                    raise AttributeError("If a ContinuousBurn is scheduled this satellites must have a value for the "
-                                         "attribute 'mass'.")
-
-            satellite.impulsive_burns.sort(key=lambda x: x.start_time)  # Sort from earliest to latest.
-            satellite.continuous_burns.sort(key=lambda x: x.start_time)  # Sort from earliest to latest.
-            satellite.inverted_continuous_burns.sort(key=lambda x: x.end_time)  # Sort from latest to earliest.
+            satellite._events.sort(key=lambda x: x.start_time)  # Sort from earliest to latest.
 
             # There are a bunch of optional parameters for each satellite only needed for specific perturbations. We
             # want to make sure that if a perturbation is enabled that the user has input value for all the needed

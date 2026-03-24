@@ -66,21 +66,6 @@ class Satellite:
         Dimensionless parameter proportional to how much solar radiation is reflected by the ``mean_reflective_area``.
         0 = transparent, 1 = full absorption, and 2 = full reflection. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
-    impulsive_burns : list[:class:`~hohmannpy.astro.ImpulsiveBurn`]
-        The set of scheduled impulsive burns for this satellite. These will end up sorted from earliest to latest based
-        on their ``start_time`` attribute.
-    continuous_burns : list[:class:`~hohmannpy.astro.ContinuousBurn`]
-        The set of scheduled continuous.rst burns for this satellite. These will end up sorted from earliest to latest based
-        on their ``start_time`` attribute.
-    inverted_continuous_burns : list[:class:`~hohmannpy.astro.ContinuousBurn`]
-        Same as ``continuous_burns``, but this time sorted from earliest to latest based on their ``end_time``
-        attribute.
-    impulsive_burn_index : int
-        Which burn from ``impulsive_burns`` is currently scheduled next.
-    continuous_burn_start_index : int
-        Which burn from ``continuous_burns`` is currently scheduled to start next.
-    continuous_burn_end_index : int
-        Which burn from ``inverted_continuous_burns`` is currently scheduled to end next.
 
     Notes
     -----
@@ -99,34 +84,31 @@ class Satellite:
             mean_reflective_area: float = None,
             reflectivity: float = None
     ):
-        self.name = name
-        self.starting_orbit = starting_orbit
-        self.color = color
+        self.name: str = name
+        self.starting_orbit: orbits.Orbit = starting_orbit
+        self.color: str = color
 
-        self.impulsive_burns: list[maneuvers.ImpulsiveBurn] = []
-        self.continuous_burns: list[maneuvers.ContinuousBurn] = []
-        self.inverted_continuous_burns: list[maneuvers.ContinuousBurn] = []
-
-        # Sort the scheduled burns into separate continuous.rst and impulsive burn lists. Don't sort them yet, this is
-        # handled by the Mission class.
+        # Form a list of all events that will need mandatory propagation steps. Sorting will then take place back in the
+        # Mission class.
+        self._events: list[tuple[float, str, Union[maneuvers.ImpulsiveBurn, maneuvers.ContinuousBurn]]] = []
+        self._num_events: int = 0
+        self._event_index: int = 0
         if burns is not None:
             for burn in burns:
                 if isinstance(burn, maneuvers.ImpulsiveBurn):
-                    self.impulsive_burns.append(burn)
+                    self._events.append((burn.start_time, "impulsive", burn))
                 else:
-                    self.continuous_burns.append(burn)
-                    self.inverted_continuous_burns = self.continuous_burns.copy()
-
-            self.impulsive_burn_index = 0
-            self.continuous_burn_start_index = 0
-            self.continuous_burn_end_index = 0
+                    self._events.append((burn.start_time, "continuous_start", burn))
+                    self._events.append((burn.end_time, "continuous_end", burn))
+                self._num_events += 2
 
         # Perturbation-specific parameters.
-        self.mass = mass
-        self.ballistic_coeff = ballistic_coeff
-        self.mean_reflective_area = mean_reflective_area
-        self.reflectivity = reflectivity
+        self.mass: float = mass
+        self.ballistic_coeff: float = ballistic_coeff
+        self.mean_reflective_area: float = mean_reflective_area
+        self.reflectivity: float = reflectivity
 
+        # Other parameters.
         self.orbit: orbits.Orbit = copy.deepcopy(starting_orbit)  # This will be updated over time by the propagator.
         self.loggers: Optional[list[logging.Logger]] = None  # Filled in by the __init__() of Mission.
 
@@ -169,7 +151,7 @@ class Moon(Satellite):
             true_anomaly=initial_true_anomaly,
         )
         super().__init__(name, starting_orbit)
-        self.loggers = [logging.StateLogger()]
+        self.loggers: list[logging.Logger] = [logging.StateLogger()]
 
 
 class Earth(Satellite):
@@ -202,9 +184,9 @@ class Earth(Satellite):
             grav_param=1.32712440018e20
         )
         super().__init__(name, starting_orbit)
-        self.loggers = [logging.StateLogger()]
+        self.loggers: list[logging.Logger] = [logging.StateLogger()]
 
-    def _compute_initial_true_anomaly(self, initial_global_time: time.Time, solver_tol: float):
+    def _compute_initial_true_anomaly(self, initial_global_time: time.Time, solver_tol: float) -> float:
         r"""
         Calculates the true anomaly of the Earth at the initial date.
 

@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING
 import numpy as np
 import scipy as sp
 
-from . import base
+from . import kepler
 
 if TYPE_CHECKING:
     from .. import spacecraft, perturbations
 
 
-class UniversalVariablePropagator(base.Propagator):
+class UniversalVariablePropagator(kepler.KeplerPropagator):
     r"""
     Propagates orbits using an f and g functions as well as a universal variable formulation of Kepler's equation.
 

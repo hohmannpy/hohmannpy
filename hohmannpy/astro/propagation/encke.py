@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 import scipy as sp
 
-from . import base, universal_variable
+from . import base, universal_variable, cowell
 from .. import orbits
 
 if TYPE_CHECKING:
     from .. import spacecraft, perturbations
 
 
-class EnckePropagator(universal_variable.UniversalVariablePropagator):
+class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.CowellPropagator):
     r"""
     Non-Keplerian propagator which uses a modified set of equations of motion where the position is given by::
 

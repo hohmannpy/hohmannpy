@@ -29,7 +29,7 @@ class Logger(ABC):
 
         All child classes must implement this method with the following steps:
 
-        1) Allocate space using :func:`numpy.zeros()` where the data is stored column-wise with N + 2M columns where N = the number of timesteps stored in the ``Propagator``'s ``timestep`` attribute and M is the number of events scheduled for the :class:`~hohmannpy.astro.Satellite` whose data is being logged.
+        1) Allocate space using :func:`numpy.zeros()` where the data is stored column-wise with N + M columns where N = the number of timesteps stored in the ``Propagator``'s ``timestep`` attribute and M is the number of events scheduled for the :class:`~hohmannpy.astro.Satellite` whose data is being logged.
 
         2) Fill in the 0th column of each array with the orbit's initial values for the stored data.
 
@@ -110,7 +110,7 @@ class StateLogger(Logger):
         self.time_history = None
 
     def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
-        length = timesteps + events * 2 + 1
+        length = timesteps + events + 1
 
         self.position_history = np.zeros([3, length])
         self.velocity_history = np.zeros([3, length])
@@ -205,7 +205,7 @@ class ClassicalElementsLogger(Logger):
         self.true_latitude_history = None
 
     def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
-        length = timesteps + events * 2 + 1
+        length = timesteps + events + 1
 
         self.sm_axis_history = np.zeros([1, length])
         self.sl_rectum_history = np.zeros([1, length])
@@ -296,7 +296,7 @@ class EquinoctialElementsLogger(Logger):
         self.n_component2_history = None
 
     def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
-        length = timesteps + events * 2 + 1
+        length = timesteps + events + 1
 
         self.e_component1_history = np.zeros([1, length])
         self.e_component2_history = np.zeros([1, length])
@@ -346,7 +346,7 @@ class EccentricAnomalyLogger(Logger):
         self.eccentric_anomaly_history = None
 
     def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
-        length = timesteps + events * 2 + 1
+        length = timesteps + events + 1
 
         self.eccentric_anomaly_history = np.zeros([1, length])
 
@@ -384,7 +384,7 @@ class UniversalVariableLogger(Logger):
         self.stumpff_param_history = None
 
     def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
-        length = timesteps + events * 2 + 1
+        length = timesteps + events + 1
 
         self.universal_variable_history = np.zeros([1, length])
         self.stumpff_param_history = np.zeros([1, length])

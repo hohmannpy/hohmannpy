@@ -70,23 +70,21 @@ class CowellPropagator(base.Propagator):
         #   2) Start a true loop that iterates through all events scheduled between the current time and the next
         #       "standard time". An event can be one of three things: an impulsive burn, a continuous burn starting, or
         #       a continuous burn ending.
-        #   3) For each of these event types, determine when the next will occur (if any). Then, out of these determine
-        #       which event will occur next.
-        #   4) For each iteration of the loop, take a mini-timestep from the current time to the time of the next event.
+        #   3) For each iteration of the loop, take a mini-timestep from the current time to the time of the next event.
         #       Then, propagate over this mini-timestep.
-        #   5) The next action depends on the type of event.
+        #   4) The next action depends on the type of event.
         #       Impulsive burn:
         #           i) Add the change in velocity.
         #           ii) Update the orbital elements after the impulse and log the results manually.
         #       Continuous burn start:
-        #           i) Increment the satellite's continuous_burn_start_index by 1.
+        #           i) Activate continuous burn.
         #       Continuous burn end:
-        #           i) Increment the satellite's continuous_burn_end_index by 1.
+        #           i) Deactivate continuous burn.
         #       Note that the actual application acceleration due to the continuous burn is handled independently of
         #       this loop by eom(). This loop simply ensures that the discrete time grid includes the exact times at
-        #       which a continuous.rst burn starts and stops to prevent discontinuities in integration.
-        #   6) Repeat 3-5 until all events scheduled before the next standard time are completed.
-        #   7) Take a mini-timestep from the time of the last event till the next standard time. Then, propagate over
+        #       which a continuous burn starts and stops to prevent discontinuities in integration.
+        #   5) Repeat 3-4 until all events scheduled before the next standard time are completed.
+        #   6) Take a mini-timestep from the time of the last event till the next standard time. Then, propagate over
         #       this mini-timestep.
         for timestep in range(1, self._timesteps + 1):
             for name, satellite in self._satellites.items():
