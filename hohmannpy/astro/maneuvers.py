@@ -67,7 +67,6 @@ class ImpulsiveBurn:
             velocity_change = self.velocity_change
 
         satellite.orbit.velocity += velocity_change  # Increase velocity.
-        satellite.impulsive_burn_index += 1  # Increment this index to indicate this burn fired.
 
     def _compute_sat_2_inertial_dcm(self, satellite: spacecraft.Satellite) -> np.ndarray:
         r"""

@@ -64,7 +64,7 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
             if times[0, i] <= times[0, i - 1]:
                 times[0, i] = times[0, i - 1] + 1e-9
 
-        spline = PySide6.QtCharts.QSplineSeries()
+        spline = PySide6.QtCharts.QLineSeries()
         spline.append([
             PySide6.QtCore.QPointF(x, y)
             for x, y in zip(

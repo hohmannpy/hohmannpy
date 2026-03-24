@@ -131,7 +131,7 @@ class Mission:
                         if event[2].start_time < 0:
                             raise ValueError("Burns may only be scheduled for after the start of the mission.")
 
-            satellite._events.sort(key=lambda x: x.start_time)  # Sort from earliest to latest.
+            satellite._events.sort(key=lambda x: x[0])  # Sort from earliest to latest.
 
             # There are a bunch of optional parameters for each satellite only needed for specific perturbations. We
             # want to make sure that if a perturbation is enabled that the user has input value for all the needed

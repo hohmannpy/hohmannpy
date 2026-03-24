@@ -42,25 +42,14 @@ class Propagator(ABC):
     def _propagate(
             self,
             satellites: dict[str, spacecraft.Satellite],
-            runtime: float,
+            runtime: float,  # Total length of the mission in seconds.
             perturbing_forces: list[perturbations.Perturbation] = None
     ):
-        r"""
+        """
         Simulate one or more satellites' orbits in time.
 
         This method is designed to support child classes' implementations of it via a call to it using ``super()``.
         It fills in all the attributes that were set to ``None`` when ``__int__()`` was called.
-
-        Parameters
-        ----------
-        satellites : dict[str, :class:`~hohmannpy.astro.Satellite`]
-            Dictionary which hold the orbits to propagate as an attribute named ``orbit`` attached to each satellite.
-            Satellites are indexed by their name.
-        runtime : float
-            How many :math:`s` to run the propagation for.
-        perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
-            Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are
-            added a non-Keplerian propagator such as ``CowellPropagator`` must be used.
         """
 
         self._satellites = satellites
@@ -102,11 +91,14 @@ class Propagator(ABC):
         #       this mini-timestep.
         for timestep in range(1, self._timesteps + 1):
             for name, satellite in self._satellites.items():
-                if satellite._events:
+                if satellite._events and satellite._event_index < len(satellite._events):
                     next_std_time = satellite.orbit.time + self._step_size
 
                     while True:
-                        event = satellite._events[satellite._events_index]
+                        if satellite._event_index >= len(satellite._events):
+                            break
+
+                        event = satellite._events[satellite._event_index]
 
                         if next_std_time >= event[0]:
                             self._step_wrapper(satellite, event[0] - satellite.orbit.time)
@@ -121,16 +113,13 @@ class Propagator(ABC):
 
                                     self._set_initial_conditions(satellite)
                                     self._log(satellite)
-
-                                    satellite._events_index += 2
                                 case "continuous_start":
                                     self._active_burns[name].append(event[2])
-                                    satellite._events_index += 1
                                 case "continuous_end":
                                     self._active_burns[name][:] = [
                                         x for x in self._active_burns[name] if x is not event[2]
                                     ]
-                                    satellite._events_index += 1
+                            satellite._event_index += 1
                         else:
                             break
                     self._step_wrapper(satellite, next_std_time - satellite.orbit.time)
@@ -138,6 +127,12 @@ class Propagator(ABC):
                     self._step_wrapper(satellite, self._step_size)
 
     def _step_wrapper(self, satellite: spacecraft.Satellite, time_change: float):
+        """
+        Called each timestep to propagate the orbit.
+
+        This is a wrapper around child classes' step() implementation which handles shared code.
+        """
+
         satellite.orbit.time += time_change
         self._step(satellite, time_change)
 
@@ -155,13 +150,8 @@ class Propagator(ABC):
         self._log(satellite)
 
     def _log(self, satellite: spacecraft.Satellite):
-        r"""
+        """
         For a satellite being propagated access their stored :class:`~hohmannpy.astro.Logger`'s and log data.
-
-        Parameters
-        ----------
-        satellite : spacecraft.Satellite
-            Spacecraft to log data for.
         """
 
         for logger in satellite.loggers:
@@ -169,8 +159,21 @@ class Propagator(ABC):
 
     @abstractmethod
     def _set_initial_conditions(self, satellite: spacecraft.Satellite):
+        """
+        Set the initial conditions of the satellite as needed by the propagation algorithm.
+
+        This is used by Keplerian propagators which need an unchanging base point to propagate from in order to maintain
+        energy conservation.
+        """
+
         pass
 
     @abstractmethod
     def _step(self, satellite: spacecraft.Satellite, del_time: float):
+        """
+        One step in the propagation loop.
+
+        All logic which isn't included in _step_wrapper() because it varies from class to class.
+        """
+
         pass

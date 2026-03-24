@@ -482,21 +482,59 @@ class ViewerManager:
                     times[0, i] = times[0, i - 1] + 1e-9
             positions = satellite.position_history.T / 1000
             velocities = satellite.velocity_history.T / 1000
-
+            times = times.squeeze()
             self.splines["positions"][name] = (
                 sp.interpolate.make_interp_spline(
-                    times.squeeze(),
+                    times,
                     positions,
                     k=3
                 )
             )
-            self.splines["velocities"][name] = (
-                sp.interpolate.make_interp_spline(
-                    times.squeeze(),
-                    velocities,
-                    k=3
+
+            if len([x for x in satellite._events if x[1] == "impulsive"]) > 0:
+                jump_times = [x[0] for x in satellite._events if x[1] == "impulsive"]
+                start_time = times[0]
+                splines = []
+
+                for jump_time in jump_times:
+                    time_chunk = times[(times >= start_time) & (times < jump_time)]
+                    vel_chunk = velocities[(times >= start_time) & (times < jump_time), :]
+                    splines.append(
+                        sp.interpolate.make_interp_spline(
+                            time_chunk,
+                            vel_chunk,
+                            k=1
+                        )
+                    )
+                    start_time = jump_time
+
+                time_chunk = times[(times >= start_time)]
+                vel_chunk = velocities[(times >= start_time), :]
+                splines.append(
+                    sp.interpolate.make_interp_spline(
+                        time_chunk,
+                        vel_chunk,
+                        k=1
+                    )
                 )
-            )
+
+                def full_spline(time):
+                    for j in range(len(jump_times)):
+                        if time < jump_times[j]:
+                            return splines[j](time)
+                    else:
+                        return splines[-1](time)
+
+                self.splines["velocities"][name] = full_spline
+
+            else:
+                self.splines["velocities"][name] = (
+                    sp.interpolate.make_interp_spline(
+                        times,
+                        velocities,
+                        k=3
+                    )
+                )
 
         # Set up the timer.
         self.timer = PySide6.QtCore.QTimer()
