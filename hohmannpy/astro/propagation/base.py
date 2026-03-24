@@ -30,7 +30,7 @@ class Propagator(ABC):
     name = ""  # Set by child classes and used for command line output.
     energy_conserving = False
 
-    def __init__(self, step_size: float = 60):
+    def __init__(self, step_size: float = 60, **kwargs):
         self._step_size = step_size
 
         self.satellites: Optional[dict[str, spacecraft.Satellite]] = None

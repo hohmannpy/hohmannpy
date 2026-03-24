@@ -35,7 +35,8 @@ class KeplerPropagator(base.Propagator):
             self,
             step_size: float = 60,
             solver_tol: float = 1e-8,
-            fg_constraint=True
+            fg_constraint=True,
+            **kwargs
     ):
         self._solver_tol = solver_tol
         self._fg_constraint = fg_constraint
@@ -46,7 +47,7 @@ class KeplerPropagator(base.Propagator):
         self._initial_velocities = {}
         self._initial_eccentric_anomalies = {}
 
-        super().__init__(step_size)
+        super().__init__(step_size=step_size, **kwargs)
 
     def _set_initial_conditions(self, satellite: spacecraft.Satellite):
         self._initial_times[satellite.name] = satellite.orbit.time

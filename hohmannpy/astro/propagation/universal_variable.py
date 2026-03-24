@@ -7,7 +7,7 @@ import scipy as sp
 from . import base
 
 if TYPE_CHECKING:
-    from .. import spacecraft, perturbations
+    from .. import spacecraft
 
 
 class UniversalVariablePropagator(base.Propagator):
@@ -47,7 +47,8 @@ class UniversalVariablePropagator(base.Propagator):
             solver_tol: float = 1e-8,
             stumpff_tol: float = 1e-8,
             stumpff_series_length: int = 10,
-            fg_constraint: bool = True
+            fg_constraint: bool = True,
+            **kwargs
     ):
         self._fg_constraint = fg_constraint
         self._solver_tol = solver_tol
@@ -59,26 +60,25 @@ class UniversalVariablePropagator(base.Propagator):
         self._initial_positions = {}
         self._initial_velocities = {}
 
-        super().__init__(step_size)
+        super().__init__(step_size=step_size, **kwargs)
 
     def _set_initial_conditions(self, satellite: spacecraft.Satellite):
-        for name, satellite in self._satellites.items():
-            self._initial_times[name] = satellite.orbit.time
-            self._initial_positions[name] = satellite.orbit.position.copy()
-            self._initial_velocities[name] = satellite.orbit.velocity.copy()
+        self._initial_times[satellite.name] = satellite.orbit.time
+        self._initial_positions[satellite.name] = satellite.orbit.position.copy()
+        self._initial_velocities[satellite.name] = satellite.orbit.velocity.copy()
 
-            # Conveniently, both the universal variable and Stumpff parameter start at 0.
-            satellite.orbit.universal_variable = 0  # Needed for logging purposes.
-            satellite.orbit.stumpff_param = 0
+        # Conveniently, both the universal variable and Stumpff parameter start at 0.
+        satellite.orbit.universal_variable = 0  # Needed for logging purposes.
+        satellite.orbit.stumpff_param = 0
 
-            # For parabolic orbits the semi-major axis is infinite so in order for the solver to handle elliptic,
-            # parabolic, and hyperbolic orbits using one set of equations it is replaced with the inverse semi-major
-            # axis.
-            satellite.orbit.inverse_sm_axis = (
-                    (2 * satellite.orbit.grav_param / np.linalg.norm(self._initial_positions[name])
-                     - np.linalg.norm(self._initial_velocities[name]) ** 2)
-                    / satellite.orbit.grav_param
-            )
+        # For parabolic orbits the semi-major axis is infinite so in order for the solver to handle elliptic,
+        # parabolic, and hyperbolic orbits using one set of equations it is replaced with the inverse semi-major
+        # axis.
+        satellite.orbit.inverse_sm_axis = (
+                (2 * satellite.orbit.grav_param / np.linalg.norm(self._initial_positions[satellite.name])
+                 - np.linalg.norm(self._initial_velocities[satellite.name]) ** 2)
+                / satellite.orbit.grav_param
+        )
 
     def _step(self, satellite: spacecraft.Satellite, time_change: float):
         # For each satellite, first retrieve the orbit. Then, compute the universal variable on the next time step from
@@ -131,7 +131,7 @@ class UniversalVariablePropagator(base.Propagator):
         )
 
     def _stumpff_funcs(self, stumpff_param) -> tuple[float, float]:
-        r"""
+        """
         Computes the Stumpff functions/series for a given value of the Stumpff parameter.
 
         The form of the Stumpff series is not based off the type of orbit, instead it is based of the sign and magnitude
@@ -222,7 +222,7 @@ class UniversalVariablePropagator(base.Propagator):
             initial_velocity: np.ndarray,
             initial_guess: float,
     ) -> float:
-        r"""
+        """
         Function used to compute the new universal variable directly as a function of time.
 
         Kepler's equation is transcendental wrt. universal variable so root-finding via :func:`scipy.optimize.newton()`
