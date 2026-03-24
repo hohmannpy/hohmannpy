@@ -24,6 +24,36 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.Cow
     numerically integrating the deviation of the true orbit from the Keplerian reference orbit. The idea is that
     integration errors are smaller when they compound for a smaller value. If accuracy is still an issue, reduce step
     size.
+
+    step_size : float
+        Time interval between propagation steps. If one is not provided by the user it will be set in
+        :meth:`propagate()` to 60 :math:`s`.
+    rectification_tol : float
+        When the deviation between the true and reference orbits grows large enough (represented by the ratio of their
+        positions' magnitudes being greater than this tolerance), reset the rectified orbit by setting it equal to the
+        current true orbit.
+    encke_tol : float
+        When the Encke parameter is close to zero (defined by this tolerance) the Encke function, which is used to
+        compute the position, is undefined so must switch to an infinite series definition of it.
+    encke_series_length : int
+        How many terms to include when using the infinite series definition of the Encke function.
+    solver_tol: float
+        Error tolerance when performing root-finding to solver Kepler's equation.
+    fg_constraint: bool
+        Flag which indicates whether to compute the derivative of the g function (``False``) or to use a constraint to
+        eliminate it (``True``).
+    stumpff_tol: float
+        The universal variable is not an angular quantity, so it is used to compute a variable known as the Stumpff
+        parameter whose root is an angle. The Stumpff parameter is used to compute two hypergeometric series, termed as
+        Stumpff series, from which the f and g functions may be assembled. For most values of the Stumpff parameter
+        these series converge absolutely to either trigonometric or hyper-trigonometric functions, but when it is small
+        the Stumpff series must be computed via summation. "Small" is defined here as the absolute value of the Stumpff
+        parameter being under ``stumpff_tol``.
+    stumpff_series_length : int
+        When the Stumpff series are computed via summation, how many terms to include.
+    motion : str
+        Whether rotational dynamics should be propagated in addition to translational dynamics, and if so if there
+        should be coupling between the two.
     """
 
     name = "Encke"
