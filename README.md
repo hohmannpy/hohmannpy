@@ -2,6 +2,6 @@
 
 An open-source library built for rapid spacecraft mission design and iteration.
 
-**PyPi:** https://pypi.org/project/hohmannpy/    
+**PyPi:** https://pypi.org/project/hohmannpy/  
 **Documentation:** https://hohmannpy.github.io/   
 **Source code:** https://github.com/hohmannpy/hohmannpy  
