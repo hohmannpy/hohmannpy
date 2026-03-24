@@ -43,3 +43,9 @@ def euler_2_dcm(angle: float, axis: int):
         return dcm
     else:
         raise ValueError(f"{axis} is not a valid axis for a Euler angle-based DCM to be generated about.")
+
+def axis_angle_2_dcm(angle, axis):
+    pass
+
+def quaternion_2_dcm(quaternion):
+    pass

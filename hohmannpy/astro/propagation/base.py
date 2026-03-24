@@ -8,9 +8,6 @@ if TYPE_CHECKING:
     from .. import perturbations, spacecraft, maneuvers
 
 
-# TODO:
-#  - (Post-alpha) There is a lot of redundant code between propagators, eliminate as much of it as possible via mixins
-#        and dependency injection. Particularly wrt. UniversalVariablePropagator and EnckePropagator.
 class Propagator(ABC):
     r"""
     Base class for all orbit propagators.

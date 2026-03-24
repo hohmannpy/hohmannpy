@@ -26,7 +26,7 @@ from .logging import (
 
 
 # Other libraries
-from .mission import Mission
+from .missions import Mission
 from .spacecraft import Satellite, Earth, Moon
 from .orbits import Orbit
 from .time import Time

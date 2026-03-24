@@ -38,6 +38,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.Cow
             stumpff_tol: float = 1e-8,
             stumpff_series_length: int = 10,
             fg_constraint: bool = True,
+            motion: str = "",
             **kwargs
     ):
         self._rectification_tol = rectification_tol
@@ -57,6 +58,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.Cow
             stumpff_tol=stumpff_tol,
             stumpff_series_length=stumpff_series_length,
             fg_constraint=fg_constraint,
+            motion=motion,
             **kwargs
         )
 

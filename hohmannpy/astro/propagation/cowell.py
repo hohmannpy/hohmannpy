@@ -23,6 +23,9 @@ class CowellPropagator(base.Propagator):
     step_size : float
         Time interval between propagation steps. If one is not provided by the user it will be set in
         :meth:`propagate()` to 60 :math:`s`.
+    motion : str
+        Whether rotational dynamics should be propagated in addition to translational dynamics, and if so if there
+        should be coupling between the two.
     """
 
     name = "Cowell"
@@ -30,8 +33,10 @@ class CowellPropagator(base.Propagator):
     def __init__(
             self,
             step_size: float = 60,
+            motion: str = "",
             **kwargs
     ):
+        self._motion = motion
         super().__init__(step_size=step_size, **kwargs)
 
     def _set_initial_conditions(self, satellite: spacecraft.Satellite):
@@ -56,7 +61,6 @@ class CowellPropagator(base.Propagator):
             t: float,
             y: np.ndarray,  # Should be (3 x position, 3 x velocity, other quantities...)
             satellite: spacecraft.Satellite,
-            motion="translational",
             **kwargs
     ) -> np.ndarray:
         """
@@ -69,7 +73,11 @@ class CowellPropagator(base.Propagator):
         y0_dot, y1_dot, y2_dot = self._positon_eom(t, y)
 
         # Based on whether attitude dynamics are included or not assemble EOMs.
-        match motion:
+        match self._motion:
+            case "decoupled_attitude":
+                pass
+            case "coupled_attitude":
+                pass
             case _:
                 y3_dot, y4_dot, y5_dot = self._decoupled_velocity_eom(t, y, satellite, **kwargs)
 
