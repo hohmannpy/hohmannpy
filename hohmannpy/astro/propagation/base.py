@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -10,7 +11,7 @@ if TYPE_CHECKING:
 # TODO:
 #  - (Post-alpha) There is a lot of redundant code between propagators, eliminate as much of it as possible via mixins
 #        and dependency injection. Particularly wrt. UniversalVariablePropagator and EnckePropagator.
-class Propagator:
+class Propagator(ABC):
     r"""
     Base class for all orbit propagators.
 
@@ -65,6 +66,19 @@ class Propagator:
         # Compute number of discrete timesteps to propagate for.
         self._timesteps = int(np.floor(runtime / self._step_size))
 
+        for name, satellite in self._satellites.items():
+            # Setup the loggers.
+            burns = len(satellite.impulsive_burns) + len(satellite.continuous_burns)
+            for logger in satellite.loggers:
+                logger.setup(initial_orbit=satellite.orbit, timesteps=self._timesteps, burns=burns)
+
+            self._set_initial_conditions(satellite)
+
+        for timestep in range(1, self._timesteps + 1):
+            for name, satellite in self._satellites.items():
+                if satellite.events:
+                    pass
+
     def _log(self, satellite: spacecraft.Satellite):
         r"""
         For a satellite being propagated access their stored :class:`~hohmannpy.astro.Logger`'s and log data.
@@ -77,3 +91,7 @@ class Propagator:
 
         for logger in satellite.loggers:
             logger.log(current_orbit=satellite.orbit)
+
+    @abstractmethod
+    def _set_initial_conditions(self, satellite: spacecraft.Satellite):
+        pass

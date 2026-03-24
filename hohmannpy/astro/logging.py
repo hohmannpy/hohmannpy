@@ -23,13 +23,13 @@ class Logger(ABC):
         self._current_index: int = 0  # Tracks column-wise position along all history arrays.
 
     @abstractmethod
-    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
         r"""
         Sets up a logger.
 
         All child classes must implement this method with the following steps:
 
-        1) Allocate space using :func:`numpy.zeros()` where the data is stored column-wise with N + 2M columns where N = the number of timesteps stored in the ``Propagator``'s ``timestep`` attribute and M is the number of burns scheduled for the :class:`~hohmannpy.astro.Satellite` whose data is being logged.
+        1) Allocate space using :func:`numpy.zeros()` where the data is stored column-wise with N + 2M columns where N = the number of timesteps stored in the ``Propagator``'s ``timestep`` attribute and M is the number of events scheduled for the :class:`~hohmannpy.astro.Satellite` whose data is being logged.
 
         2) Fill in the 0th column of each array with the orbit's initial values for the stored data.
 
@@ -39,9 +39,9 @@ class Logger(ABC):
             The orbit which holds the data to log.
         timesteps : int
             How many timesteps to log the data for.
-        burns : int
-            How many burns to log data for. Two points are logged for each burn. For impulsive burns this is the
-            immediately before and after the impulse (two data points on the same timestep). For continuous.rst burns this
+        events : int
+            How many events to log data for. For events two points are logged. For impulsive events this is the
+            immediately before and after the impulse (two data points on the same timestep). For continuous events this
             is the start and end times of the burn. These additional points are included for precision purposes.
 
         Notes
@@ -109,8 +109,8 @@ class StateLogger(Logger):
         self.velocity_history = None
         self.time_history = None
 
-    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
-        length = timesteps + burns * 2 + 1
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
+        length = timesteps + events * 2 + 1
 
         self.position_history = np.zeros([3, length])
         self.velocity_history = np.zeros([3, length])
@@ -204,8 +204,8 @@ class ClassicalElementsLogger(Logger):
         self.argl_history = None
         self.true_latitude_history = None
 
-    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
-        length = timesteps + burns * 2 + 1
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
+        length = timesteps + events * 2 + 1
 
         self.sm_axis_history = np.zeros([1, length])
         self.sl_rectum_history = np.zeros([1, length])
@@ -295,8 +295,8 @@ class EquinoctialElementsLogger(Logger):
         self.n_component1_history = None
         self.n_component2_history = None
 
-    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
-        length = timesteps + burns * 2 + 1
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
+        length = timesteps + events * 2 + 1
 
         self.e_component1_history = np.zeros([1, length])
         self.e_component2_history = np.zeros([1, length])
@@ -345,8 +345,8 @@ class EccentricAnomalyLogger(Logger):
 
         self.eccentric_anomaly_history = None
 
-    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
-        length = timesteps + burns * 2 + 1
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
+        length = timesteps + events * 2 + 1
 
         self.eccentric_anomaly_history = np.zeros([1, length])
 
@@ -383,8 +383,8 @@ class UniversalVariableLogger(Logger):
         self.universal_variable_history = None
         self.stumpff_param_history = None
 
-    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, burns: int):
-        length = timesteps + burns * 2 + 1
+    def setup(self, initial_orbit: orbits.Orbit, timesteps: int, events: int):
+        length = timesteps + events * 2 + 1
 
         self.universal_variable_history = np.zeros([1, length])
         self.stumpff_param_history = np.zeros([1, length])

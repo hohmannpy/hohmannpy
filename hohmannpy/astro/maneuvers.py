@@ -96,13 +96,13 @@ class ImpulsiveBurn:
 
 class ContinuousBurn(perturbations.Perturbation):
     r"""
-    The base class for all burns whose acceleration is delivered over a continuous.rst period of time.
+    The base class for all burns whose acceleration is delivered over a continuous period of time.
 
     This can be passed to :class:`~hohmannpy.astro.Satellite`'s ``burns`` parameter during instantiation to schedule it
     for that satellite. However, this class doesn't define the burn profile so it should never be directly instantiated.
     Instead, use its children such as :class:`~hohmannpy.astro.FunctionContinuousBurn`.
 
-    This is an extension of :class:`~hohmannpy.astro.Perturbation` so within propagators continuous.rst burns are
+    This is an extension of :class:`~hohmannpy.astro.Perturbation` so within propagators continuous burns are
     essentially treated as just another form of propagation.
 
     Parameters

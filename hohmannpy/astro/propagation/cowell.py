@@ -129,7 +129,7 @@ class CowellPropagator(base.Propagator):
                             break
                         event_type, next_event_time = min(valid_events, key=lambda x: x[1])
 
-                        # If this event would occur before next_std_time, propagate to its event time and then perform
+                        # If this event occurred before next_std_time, propagate to its event time and then perform
                         # the necessary logic.
                         if next_std_time >= next_event_time:
                             if event_type == "impulsive":
