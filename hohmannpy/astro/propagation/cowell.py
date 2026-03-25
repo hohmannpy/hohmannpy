@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from . import base
+from ...dynamics import attitude
 
 if TYPE_CHECKING:
     from .. import spacecraft
@@ -23,9 +24,6 @@ class CowellPropagator(base.Propagator):
     step_size : float
         Time interval between propagation steps. If one is not provided by the user it will be set in
         :meth:`propagate()` to 60 :math:`s`.
-    motion : str
-        Whether rotational dynamics should be propagated in addition to translational dynamics, and if so if there
-        should be coupling between the two.
     """
 
     name = "Cowell"
@@ -33,10 +31,8 @@ class CowellPropagator(base.Propagator):
     def __init__(
             self,
             step_size: float = 60,
-            motion: str = "",
             **kwargs
     ):
-        self._motion = motion
         super().__init__(step_size=step_size, **kwargs)
 
     def _set_initial_conditions(self, satellite: spacecraft.Satellite):
@@ -54,32 +50,31 @@ class CowellPropagator(base.Propagator):
             satellite=satellite,
         )
         orbit.position = np.array(state[:3])
-        orbit.velocity = np.array(state[3:])
+        orbit.velocity = np.array(state[3:6])
 
     def _eom_compiler(
             self,
             t: float,
-            y: np.ndarray,  # Should be (3 x position, 3 x velocity, other quantities...)
+            y: np.ndarray,  # Should be (3 x position, 3 x velocity, 4 x quaternion, 3 x angular velocity)
             satellite: spacecraft.Satellite,
             **kwargs
     ) -> np.ndarray:
         """
-        Equations of motion for a spacecraft in first order form where the state is given as (position, velocity).
+        Method which forms the equations of motion for a spacecraft in first order form where the state is given as
+        (position, velocity, attitude).
 
         The default acceleration is the two-body acceleration due to the point mass acceleration of the central body.
-        The perturbing accelerations and thrusts from continuous burns are then added.
+        The perturbing accelerations and thrusts from continuous burns are then added. If enabled attitude is also
+        simulated.
         """
 
         y0_dot, y1_dot, y2_dot = self._positon_eom(t, y)
 
         # Based on whether attitude dynamics are included or not assemble EOMs.
-        match self._motion:
-            case "decoupled_attitude":
-                pass
-            case "coupled_attitude":
-                pass
-            case _:
-                y3_dot, y4_dot, y5_dot = self._decoupled_velocity_eom(t, y, satellite, **kwargs)
+        if self._include_rotation:
+            y6_dot, y7_dot, y8_dot, y9_dot, y10_dot, y11_dot, y12_dot = self._attitude_eom(t, y, satellite, **kwargs)
+        else:
+            y3_dot, y4_dot, y5_dot = self._velocity_eom(t, y, satellite, **kwargs)
 
         # Append active continuous burns. Do these first because they can change masses.
         for burn in self._active_burns[satellite.name]:
@@ -96,12 +91,23 @@ class CowellPropagator(base.Propagator):
                 y4_dot += y4_perturb
                 y5_dot += y5_perturb
 
-        return np.array([y0_dot, y1_dot, y2_dot, y3_dot, y4_dot, y5_dot])
+        # Return state with or without rotation.
+        if self._include_rotation:
+            return np.array(
+                [
+                    y0_dot, y1_dot, y2_dot, y3_dot, y4_dot, y5_dot,
+                    y6_dot, y7_dot, y8_dot, y9_dot, y10_dot, y11_dot, y12_dot
+                ]
+            )
+        else:
+            return np.array([y0_dot, y1_dot, y2_dot, y3_dot, y4_dot, y5_dot])
 
-    def _positon_eom(self, t, y):
+    def _positon_eom(self, t: float, y: np.ndarray) -> tuple[float, float, float]:
         return y[3], y[4], y[5]
 
-    def _decoupled_velocity_eom(self, t, y, satellite, **kwargs):
+    def _velocity_eom(
+            self, t: float, y: np.ndarray, satellite: spacecraft.Satellite, **kwargs
+    ) -> tuple[float, float, float]:
         radius = np.sqrt(y[0] ** 2 + y[1] ** 2 + y[2] ** 2)
 
         y3_dot = -satellite.orbit.grav_param / radius ** 3 * y[0]
@@ -109,6 +115,14 @@ class CowellPropagator(base.Propagator):
         y5_dot = -satellite.orbit.grav_param / radius ** 3 * y[2]
 
         return y3_dot, y4_dot, y5_dot
+
+    def _attitude_eom(  # Wrapper used because Encke propagator needs to do some additional logic for these EOM.
+            self, t: float, y: np.ndarray, satellite: spacecraft.Satellite, **kwargs
+    ) -> tuple[float, float, float, float, float, float, float]:
+        y6_dot, y7_dot, y8_dot, y9_dot = attitude.attitude_eom(t, y)
+        y10_dot, y11_dot, y12_dot = attitude.rates_eom(t, y, satellite, self._perturbing_torques, **kwargs)
+
+        return y6_dot, y7_dot, y8_dot, y9_dot, y10_dot, y11_dot, y12_dot
 
     def _rk4(
             self,

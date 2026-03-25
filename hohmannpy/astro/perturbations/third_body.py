@@ -323,5 +323,6 @@ class SolarGravity(ThirdBodyGravity):
 def dummy_spline(x):
     return np.array([0, 0, 0])
 
+
 def inverted_spline(x, func):
     return -func(x)

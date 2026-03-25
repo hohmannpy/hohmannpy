@@ -40,7 +40,9 @@ class Propagator(ABC):
             self,
             satellites: dict[str, spacecraft.Satellite],
             runtime: float,  # Total length of the mission in seconds.
-            perturbing_forces: list[perturbations.Perturbation] = None
+            include_rotation: bool,
+            perturbing_forces: list[perturbations.Perturbation] = None,
+            perturbing_torques: list[perturbations.Perturbation] = None,
     ):
         """
         Simulate one or more satellites' orbits in time.
@@ -51,6 +53,11 @@ class Propagator(ABC):
 
         self._satellites = satellites
         self._perturbing_forces = perturbing_forces
+        self._perturbing_torques = perturbing_torques
+        self._include_rotation = include_rotation
+
+        if self._include_rotation and self._step_size > 1:
+            raise AttributeError("When modeling attitude select a step size of no larger than 1 second.")
 
         # Compute number of discrete timesteps to propagate for.
         self._timesteps = int(np.floor(runtime / self._step_size))

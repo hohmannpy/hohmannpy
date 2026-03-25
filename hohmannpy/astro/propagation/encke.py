@@ -51,9 +51,6 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.Cow
         parameter being under ``stumpff_tol``.
     stumpff_series_length : int
         When the Stumpff series are computed via summation, how many terms to include.
-    motion : str
-        Whether rotational dynamics should be propagated in addition to translational dynamics, and if so if there
-        should be coupling between the two.
     """
 
     name = "Encke"
@@ -68,7 +65,6 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.Cow
             stumpff_tol: float = 1e-8,
             stumpff_series_length: int = 10,
             fg_constraint: bool = True,
-            motion: str = "",
             **kwargs
     ):
         self._rectification_tol = rectification_tol
@@ -88,7 +84,6 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.Cow
             stumpff_tol=stumpff_tol,
             stumpff_series_length=stumpff_series_length,
             fg_constraint=fg_constraint,
-            motion=motion,
             **kwargs
         )
 
@@ -171,9 +166,16 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.Cow
             time_change
         )
 
-    def _decoupled_velocity_eom(self, t, y, satellite, **kwargs):
+    def _velocity_eom(
+            self, t: float, y: np.ndarray, satellite: spacecraft.Satellite, **kwargs
+    ) -> tuple[float, float, float]:
+        """
+        Overwrites the _velocity_eom() defined in CowellPropagator to compute the differential velocity between the true
+        and osculating orbit instead of the true velocity.
+        """
+
         y_ref = kwargs.get("y_ref")
-        y_true = y_ref + y
+        y_true = y_ref + y[:6]
         ref_radius = np.sqrt(y_ref[0] ** 2 + y_ref[1] ** 2 + y_ref[2] ** 2)
 
         # Compute the Encke parameter and function. If the absolute value of the Encke parameter is smaller than
@@ -200,6 +202,15 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.Cow
 
         return y3_dot, y4_dot, y5_dot
 
+    def _attitude_eom(
+            self, t: float, y: np.ndarray, satellite: spacecraft.Satellite, **kwargs
+    ) -> tuple[float, float, float, float, float, float, float]:
+        y_ref = kwargs.get("y_ref")
+        y = np.stack((y[:6] + y_ref, y[6:].copy()), axis=-1)  # Attitude EOM expect true position.
+
+        y6_dot, y7_dot, y8_dot, y9_dot, y10_dot, y11_dot, y12_dot = super()._attitude_eom(t, y, satellite, **kwargs)
+        return y6_dot, y7_dot, y8_dot, y9_dot, y10_dot, y11_dot, y12_dot
+
     def _rk4(
             self,
             t0: float,
@@ -209,7 +220,7 @@ class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.Cow
             **kwargs
     ) -> np.ndarray:
         """
-        Perform one step of 4th-order Runge Kutta integration.
+        Modified version of _rk4() from CowellPropagator.
 
         Note that this is not integration of the true state but rather the state difference. However, the EOM for the
         state difference requires the true state, so it must be reconstructed from the sum of the reference state and
