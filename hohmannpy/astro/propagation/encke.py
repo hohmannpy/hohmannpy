@@ -4,7 +4,8 @@ import numpy as np
 import scipy as sp
 
 from . import universal_variable, cowell
-from .. import orbits, spacecraft
+from .. import orbits
+from ... import spacecraft
 
 
 class EnckePropagator(universal_variable.UniversalVariablePropagator, cowell.CowellPropagator):

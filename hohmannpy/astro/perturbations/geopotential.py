@@ -9,7 +9,7 @@ from ...dynamics import dcms
 from . import base
 
 if TYPE_CHECKING:
-    from .. import spacecraft
+    from ... import spacecraft
 
 
 class NonSphericalEarth(base.Perturbation):
@@ -60,7 +60,7 @@ class NonSphericalEarth(base.Perturbation):
         Record the initial GMST of the Earth which is used to correctly orient it for geopotential modeling.
 
         This is needed by :meth:`evaluate()` but can't be passed to the base ``__init__()``. This is called during
-        :class:`~hohmannpy.astro.Mission`'s instantiation.
+        :class:`~hohmannpy.Mission`'s instantiation.
 
         Parameters
         ----------
@@ -218,7 +218,7 @@ class J2(base.Perturbation):
         Record the initial GMST of the Earth which is used to correctly orient it for geopotential modeling.
 
         This is needed by :meth:`evaluate()` but can't be passed to the base ``__init__()``. This is called during
-        :class:`~hohmannpy.astro.Mission`'s instantiation.
+        :class:`~hohmannpy.Mission`'s instantiation.
 
         Parameters
         ----------

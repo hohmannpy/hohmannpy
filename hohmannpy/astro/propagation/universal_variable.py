@@ -7,7 +7,7 @@ import scipy as sp
 from . import base
 
 if TYPE_CHECKING:
-    from .. import spacecraft
+    from ... import spacecraft
 
 
 class UniversalVariablePropagator(base.Propagator):

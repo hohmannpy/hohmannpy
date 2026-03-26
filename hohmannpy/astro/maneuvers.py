@@ -7,7 +7,8 @@ import scipy as sp
 from . import perturbations
 
 if TYPE_CHECKING:
-    from . import spacecraft, time
+    from . import time
+    from .. import spacecraft
 
 
 class ImpulsiveBurn:

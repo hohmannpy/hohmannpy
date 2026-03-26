@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from . import base
-from ...dynamics import attitude
+from ...dynamics import attitude, quaternions
 
 if TYPE_CHECKING:
-    from .. import spacecraft
+    from ... import spacecraft
 
 
 class CowellPropagator(base.Propagator):
@@ -42,13 +42,26 @@ class CowellPropagator(base.Propagator):
         # For each satellite, first retrieve the orbit. Then step the state and position forward by one timestep using
         # RK4 integration of the satellite's EOM.
         orbit = satellite.orbit
+        orientation = satellite.orientation
 
-        state = self._rk4(
-            t0=orbit.time-time_change,  # Need this because time change is added in super()._step_wrapper().
-            delt=time_change,
-            y0=np.concatenate((orbit.position, orbit.velocity)),
-            satellite=satellite,
-        )
+        if self._include_rotation:
+            state = self._rk4(
+                t0=orbit.time - time_change,  # Need this because time change is added in super()._step_wrapper().
+                delt=time_change,
+                y0=np.concatenate(
+                    (orbit.position, orbit.velocity, orientation.quaternion, orientation.angular_velocity)
+                ),
+                satellite=satellite,
+            )
+            orientation.quaternion = quaternions.Quaternion(state[6:10])
+            orientation.angular_velocity = np.array(state[10:])
+        else:
+            state = self._rk4(
+                t0=orbit.time-time_change,  # Need this because time change is added in super()._step_wrapper().
+                delt=time_change,
+                y0=np.concatenate((orbit.position, orbit.velocity)),
+                satellite=satellite,
+            )
         orbit.position = np.array(state[:3])
         orbit.velocity = np.array(state[3:6])
 
@@ -71,10 +84,9 @@ class CowellPropagator(base.Propagator):
         y0_dot, y1_dot, y2_dot = self._positon_eom(t, y)
 
         # Based on whether attitude dynamics are included or not assemble EOMs.
+        y3_dot, y4_dot, y5_dot = self._velocity_eom(t, y, satellite, **kwargs)
         if self._include_rotation:
             y6_dot, y7_dot, y8_dot, y9_dot, y10_dot, y11_dot, y12_dot = self._attitude_eom(t, y, satellite, **kwargs)
-        else:
-            y3_dot, y4_dot, y5_dot = self._velocity_eom(t, y, satellite, **kwargs)
 
         # Append active continuous burns. Do these first because they can change masses.
         for burn in self._active_burns[satellite.name]:

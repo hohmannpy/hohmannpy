@@ -223,14 +223,19 @@ class NewPlotDialog(PySide6.QtWidgets.QDialog):
                     # position and velocity specially as (3, N) vectors so need to split that up into (1, N) arrays so
                     # that the user can plot "x-Position", "y-Position", etc;
                     if isinstance(logger, logging.StateLogger):
-                        if index == 0:
-                            continue
-                        elif 1 <= index < 4:
-                            row = index - 1
+                        if 0 <= index < 3:
+                            row = index
+                            index = 0
+                        elif 3 <= index < 6:
+                            row = index - 3
                             index = 1
+                    if isinstance(logger, logging.AttitudeLogger):
+                        if 0 <= index < 4:
+                            row = index
+                            index = 0
                         elif 4 <= index < 7:
                             row = index - 4
-                            index = 2
+                            index = 1
                     else:
                         row = 0
 

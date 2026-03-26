@@ -110,6 +110,8 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
             density = self.sim.step_size / 10
         else:
             density = self.sim.step_size
+        if density < 60:
+            density = 60
 
         self.positions = {}  # Store the dense trajectories of each satellite in a dict.
         self.dense_times = np.arange(

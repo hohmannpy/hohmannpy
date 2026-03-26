@@ -46,9 +46,6 @@ def euler_2_dcm(angle: float, axis: int):
     else:
         raise ValueError(f"{axis} is not a valid axis for a Euler angle-based DCM to be generated about.")
 
-def axis_angle_2_dcm(angle, axis):  # TODO: This function.
-    pass
-
 def quaternion_2_dcm(q: quaternions.Quaternion):
     r"""
     Generate a direction cosine matrix (DCM) from a given quaternion.
@@ -64,6 +61,7 @@ def quaternion_2_dcm(q: quaternions.Quaternion):
        A (3, 3) DCM which rotates vectors by the provided quaternion.
     """
 
+    q = q / quaternions.norm(q)
     dcm = np.array(
         [
             [1 - 2 * (q[2] ** 2 + q[3] ** 2), 2 * (q[1] * q[2] - q[0] * q[3]), 2 * (q[1] * q[3] + q[0] * q[2])],
@@ -73,3 +71,11 @@ def quaternion_2_dcm(q: quaternions.Quaternion):
     )
 
     return dcm
+
+
+# TODO: These functions.
+def dcm_2_euler(dcm: np.ndarray):
+    pass
+
+def dcm_2_quaternion(dcm: np.ndarray):
+    pass

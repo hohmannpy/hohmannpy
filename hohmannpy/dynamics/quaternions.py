@@ -1,6 +1,7 @@
-from typing import Union
+from typing import Union, Any
 
 import numpy as np
+import numbers
 
 
 # TODO: Documentation.
@@ -21,45 +22,76 @@ class Quaternion:
     def __setitem__(self, index: int, value: float):
         self._data[index] = value
 
+    def __array__(self, dtype: Any = None):
+        return np.asarray(self._data, dtype)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return len(self._data)
+
     def __add__(self, other: Quaternion) -> Quaternion:
         return Quaternion(self[:] + other[:])
 
     def __sub__(self, other: Quaternion) -> Quaternion:
         return Quaternion(self[:] - other[:])
 
-    def __mul__(self, other: Quaternion) -> Quaternion:
-        q0 = self[0]
-        q1 = self[1]
-        q2 = self[2]
-        q3 = self[3]
+    def __mul__(self, other: Union[int, float, numbers.Real, Quaternion]) -> Quaternion:
+        if isinstance(other, Quaternion):
+            q0 = self[0]
+            q1 = self[1]
+            q2 = self[2]
+            q3 = self[3]
 
-        p0 = other[0]
-        p1 = other[1]
-        p2 = other[2]
-        p3 = other[3]
+            p0 = other[0]
+            p1 = other[1]
+            p2 = other[2]
+            p3 = other[3]
 
-        return Quaternion(np.array(
-            [
-                [q0 * p0 - q1 * p1 - q2 * p2 - q3 * p3],
-                [q0 * p1 + q1 * p0 + q2 * p3 - q3 * p2],
-                [q0 * p2 - q1 * p3 + q2 * p0 + q3 * p1],
-                [q0 * p3 + q1 * p2 - q2 * p1 + q3 * p0],
-            ]
-        ))
+            return Quaternion(np.array(
+                [
+                    [q0 * p0 - q1 * p1 - q2 * p2 - q3 * p3],
+                    [q0 * p1 + q1 * p0 + q2 * p3 - q3 * p2],
+                    [q0 * p2 - q1 * p3 + q2 * p0 + q3 * p1],
+                    [q0 * p3 + q1 * p2 - q2 * p1 + q3 * p0],
+                ]
+            ))
+        elif isinstance(other, (int, float, numbers.Real)):
+            return Quaternion(self._data * other)
+        else:
+            return NotImplemented
 
-    def __rmul__(self, other: Union[int, float]) -> Quaternion:
-        return Quaternion(self._data * other)
-
-    def conjugate(self) -> Quaternion:
-        return Quaternion(np.array([self[0], -self[1], -self[2], -self[3]]))
+    def __rmul__(self, other: Union[int, float, numbers.Real]) -> Quaternion:
+        if isinstance(other, (int, float, numbers.Real)):
+            return Quaternion(self._data * other)
+        else:
+            return NotImplemented
 
     def invert(self) -> Quaternion:
         return Quaternion(
             np.array([self[0], -self[1], -self[2], -self[3]]) / np.linalg.norm(self[:]) ** 2
         )
 
+    def conjugate(self) -> Quaternion:
+        return Quaternion(np.array([self[0], -self[1], -self[2], -self[3]]))
 
-def norm(quat: Quaternion) -> np.floating:
+    def __truediv__(self, other: Union[int, float, numbers.Real, Quaternion]) -> Quaternion:
+        if isinstance(other, Quaternion):
+            return self * other.invert()
+        elif isinstance(other, (int, float, numbers.Real)):
+            return Quaternion(self._data / other)
+        else:
+            return NotImplemented
+
+    def __rtruediv__(self, other: Union[int, float, numbers.Real]) -> Quaternion:
+        if isinstance(other, (int, float, numbers.Real)):
+            return other * self.invert()
+        else:
+            return NotImplemented
+
+
+def quaternion_norm(quat: Quaternion) -> np.floating:
     return np.linalg.norm(quat[:])
 
 

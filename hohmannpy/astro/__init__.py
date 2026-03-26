@@ -18,12 +18,8 @@ from .perturbations import (
     Perturbation, NonSphericalEarth, AtmosphericDrag, J2, ThirdBodyGravity, LunarGravity, SolarGravity, SolarRadiation
 )
 
-# Loggers.
-
-
 # Other libraries
-from .missions import Mission
-from .spacecraft import Satellite, Earth, Moon
+from .celestial import Earth, Moon
 from .orbits import Orbit
 from .time import Time
 from .groundtracks import Groundtrack

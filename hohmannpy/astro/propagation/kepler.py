@@ -7,7 +7,7 @@ import scipy as sp
 from . import base
 
 if TYPE_CHECKING:
-    from .. import spacecraft, perturbations
+    from ... import spacecraft
 
 
 class KeplerPropagator(base.Propagator):

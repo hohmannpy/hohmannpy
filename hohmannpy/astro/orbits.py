@@ -109,9 +109,6 @@ class Orbit:
     inverse_sm_axis: float
         Inverse of the semi-major axis of the orbit. Used by ``UniversalVariablePropagator`` so that it can handle
         parabolic orbits.
-    track_equinoctial : bool
-        Flag which indicates whether to track the equinoctial elements. By default, only the Cartesian state and the
-        classical orbital elements (as well as their degenerate cases) are tracked.
 
     Notes
     -----
@@ -131,12 +128,12 @@ class Orbit:
         self.velocity = velocity
         self.time = 0
         self.grav_param = grav_param
-        self.track_equinoctial = track_equinoctial
+        self._track_equinoctial = track_equinoctial
 
         # Compute orbital elements along with other useful attributes.
         if _default:
             self.update_classical()
-            if self.track_equinoctial:
+            if self._track_equinoctial:
                 self.update_equinoctial()
 
         # Initialize other attributes which are propagator-specific.

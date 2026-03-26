@@ -8,9 +8,10 @@ import time as python_time
 import pandas as pd
 import numpy as np
 
-from . import propagation, perturbations, time, spacecraft, maneuvers
-from .. import logging
-from ..viewer import viewing
+from hohmannpy.astro import propagation, perturbations, time, maneuvers
+from hohmannpy.logging import logging
+from hohmannpy import spacecraft
+from hohmannpy.viewer import viewing
 
 
 class Mission:
@@ -30,11 +31,11 @@ class Mission:
         The Gregorian date and UT1 time to end the mission at.
     include_rotation : bool
         If rotational dynamics should be simulated alongside translational ones.
-    loggers : list[:class:`~hohmannpy.astro.Logger`]
+    loggers : list[:class:`~hohmannpy.logging.Logger`]
         Loggers determine which data to record for each satellite during propagation. To see what data each logger
         records, check the attributes labeled ``..._history`` in their respective documentation. For example,
-        :class:`~hohmannpy.astro.StateLogger` records the time, position, and velocity of each ``Satellite``. After
-        :meth:simulate: has been called, these values can also be accessed as attributes of each ``Satellite``.
+        :class:`~hohmannpy.logging.StateLogger` records the position, and velocity of each ``Satellite``. After
+        :meth:`simulate()` has been called, these values can also be accessed as attributes of each ``Satellite``.
     propagator : :class:`~hohmannpy.astro.Propagator`
         Propagation technique to use to simulate the orbits of each ``Satellite``.
     perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
@@ -298,13 +299,13 @@ class Mission:
 
         Parameters
         ----------
-        args : tuple[:class:`~hohmannpy.astro.Propagator`, dict[str, :class:`~hohmannpy.astro.Spacecraft], int, float, list[:class:~hohmannpy.astro.Perturbation`, bool]
+        args : tuple[:class:`~hohmannpy.astro.Propagator`, dict[str, :class:`~hohmannpy.Spacecraft], int, float, list[:class:~hohmannpy.astro.Perturbation`, bool]
             Tuple of arguments needed to start propagation on a core. These include the propagator itself, a ``dict`` of
             the satellites to propagate, how long to propagate for, and any perturbations.
 
         Returns
         -------
-        satellites : dict[str, :class:`~hohmannpy.astro.Spacecraft`]
+        satellites : dict[str, :class:`~hohmannpy.Spacecraft`]
             Propagated satellites to now reintegrate with the main ``satellite`` dict.
         """
 
@@ -331,6 +332,8 @@ class Mission:
         loggers = next(iter(self.satellites.values())).loggers
         if not any(isinstance(logger, logging.StateLogger) for logger in loggers):
             raise AttributeError("No StateLogger stored for this mission, can not generate trajectories for display.")
+        if not any(isinstance(logger, logging.TimeLogger) for logger in loggers):
+            raise AttributeError("No TimeLogger stored for this mission, can not generate trajectories for display.")
 
         sim_manager = viewing.ViewerManager(
             self.satellites,

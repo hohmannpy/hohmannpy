@@ -5,7 +5,7 @@ import numpy as np
 from ..dynamics import dcms
 
 if TYPE_CHECKING:
-    from . import spacecraft
+    from .. import spacecraft
 
 
 class Groundtrack:

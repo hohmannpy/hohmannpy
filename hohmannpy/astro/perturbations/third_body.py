@@ -7,7 +7,7 @@ import numpy as np
 import scipy as sp
 
 from ...dynamics import dcms
-from .. import propagation, time, spacecraft, orbits
+from .. import propagation, time, orbits
 from ... import logging
 from . import base
 
@@ -94,7 +94,7 @@ class ThirdBodyGravity(base.Perturbation):
         Create a ``np.BSpline`` for the third and central body's orbits.
 
         Both of these attributes are needed by :meth:`evaluate()` but can't be computed in the base ``__init__()``. This
-        is called during :class:`~hohmannpy.astro.Mission`'s instantiation.
+        is called during :class:`~hohmannpy.Mission`'s instantiation.
 
         Parameters
         ----------
@@ -109,20 +109,22 @@ class ThirdBodyGravity(base.Perturbation):
         # central body's orbit is not to be propagated instead set it to a function which always returns [0, 0, 0] when
         # passed any time value.
         propagator = propagation.KeplerPropagator()
-        self.third_body.loggers = [logging.StateLogger()]
+        self.third_body.loggers = [logging.TimeLogger(), logging.StateLogger()]
 
         if self.central_body is None:
             propagator._propagate(
                 satellites={self.third_body.name: self.third_body},
                 runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,
+                include_rotation=False
             )
 
             self.cb_orbit_spline = dummy_spline
         else:
-            self.central_body.loggers = [logging.StateLogger()]
+            self.central_body.loggers = [logging.TimeLogger(), logging.StateLogger()]
             propagator._propagate(
                 satellites={self.third_body.name: self.third_body, self.central_body.name: self.central_body},
                 runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,
+                include_rotation=False
             )
 
             self.cb_orbit_spline = sp.interpolate.make_interp_spline(
@@ -224,7 +226,8 @@ class LunarGravity(ThirdBodyGravity):
             legendre_series_length: int = 10,
     ):
         # Initialize the Moon.
-        moon = spacecraft.Moon(initial_true_anomaly)
+        from .. import celestial  # Stuffed down here to prevent circular imports.
+        moon = celestial.Moon(initial_true_anomaly)
 
         super().__init__(
             third_body_grav_param=4.9048695e12,
@@ -274,6 +277,7 @@ class SolarGravity(ThirdBodyGravity):
         # Our actually third body is the Earth but to instantiate it we need the initial global time (so we can locate
         # the Earth on its orbit). That isn't passed in till finalize__init__() is called so create a temporary dummy
         # third body. We'll replace it with the Earth in the aforementioned function.
+        from ... import spacecraft  # Stuffed down here to prevent circular imports.
         dummy_third_body = spacecraft.Satellite(
             starting_orbit=orbits.Orbit(
                 position=np.array([1, 1, 1]),
@@ -306,7 +310,8 @@ class SolarGravity(ThirdBodyGravity):
         """
 
         # Initialize the Earth.
-        earth = spacecraft.Earth(initial_global_time)
+        from .. import celestial  # Stuffed down here to prevent circular imports.
+        earth = celestial.Earth(initial_global_time)
         self.third_body = earth
 
         # Call parent class' finalize__init__() to create the needed orbit splines.

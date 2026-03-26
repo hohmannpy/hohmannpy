@@ -4,7 +4,8 @@ import numpy as np
 import scipy as sp
 
 from ...dynamics import dcms
-from .. import time, spacecraft, propagation
+from .. import time, propagation
+from ... import spacecraft
 from . import base
 
 
@@ -66,7 +67,7 @@ class SolarRadiation(base.Perturbation):
         aphelion passage.
 
         Both of these attributes are needed by :meth:`evaluate()` but can't be computed in the base ``__init__()``. This
-        is called during :class:`~hohmannpy.astro.Mission`'s instantiation.
+        is called during :class:`~hohmannpy.Mission`'s instantiation.
 
         Parameters
         ----------

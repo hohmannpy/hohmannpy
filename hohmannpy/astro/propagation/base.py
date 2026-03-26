@@ -3,9 +3,11 @@ from typing import TYPE_CHECKING, Optional
 from abc import ABC, abstractmethod
 
 import numpy as np
+from ... import logging
 
 if TYPE_CHECKING:
-    from .. import perturbations, spacecraft, maneuvers
+    from .. import perturbations, maneuvers
+    from ... import spacecraft
 
 
 class Propagator(ABC):
@@ -65,7 +67,14 @@ class Propagator(ABC):
         # Propagators store a variety of variables in dictionaries indexed by satellite name. Store these variables now.
         for name, satellite in self._satellites.items():
             for logger in satellite.loggers:  # Also set up the loggers while we're at it.
-                logger.setup(initial_obj=satellite.orbit, timesteps=self._timesteps, events=satellite._num_events)
+                if isinstance(logger, (logging.AttitudeLogger, logging.EulerLogger)):
+                    logger.setup(
+                        initial_obj=satellite.orientation, timesteps=self._timesteps, events=satellite._num_events
+                    )
+                else:
+                    logger.setup(
+                        initial_obj=satellite.orbit, timesteps=self._timesteps, events=satellite._num_events
+                    )
 
             self._set_initial_conditions(satellite)
             self._active_burns[name] = []
@@ -112,7 +121,7 @@ class Propagator(ABC):
 
                                     # Log this data because it isn't logged in evaluate() and _step wasn't called.
                                     satellite.orbit.update_classical()
-                                    if satellite.orbit.track_equinoctial:
+                                    if satellite.orbit._track_equinoctial:
                                         satellite.orbit.update_equinoctial()
 
                                     self._set_initial_conditions(satellite)
@@ -143,12 +152,16 @@ class Propagator(ABC):
         # Update the needed orbital elements based on the propagation algorithm used.
         if not self.energy_conserving:
             satellite.orbit.update_classical()
-            if satellite.orbit.track_equinoctial:
+            if satellite.orbit._track_equinoctial:
                 satellite.orbit.update_equinoctial()
         else:
             satellite.orbit._update_true_anomaly()
             satellite.orbit._update_argl()
             satellite.orbit._update_true_latitude()
+
+        if self._include_rotation:
+            if satellite.orientation._track_euler:
+                satellite.orientation.update_euler()
 
         # Save results from this timestep.
         self._log(satellite)
@@ -159,7 +172,10 @@ class Propagator(ABC):
         """
 
         for logger in satellite.loggers:
-            logger.log(obj=satellite.orbit)
+            if isinstance(logger, (logging.AttitudeLogger, logging.EulerLogger)):
+                logger.log(obj=satellite.orientation)
+            else:
+                logger.log(obj=satellite.orbit)
 
     @abstractmethod
     def _set_initial_conditions(self, satellite: spacecraft.Satellite):
