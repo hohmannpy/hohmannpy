@@ -92,7 +92,7 @@ class Quaternion:
 
 
 def quaternion_norm(quat: Quaternion) -> np.floating:
-    return np.linalg.norm(quat[:])
+    return np.sqrt(quat[0] ** 2 + quat[1] ** 2 + quat[2] ** 2 + quat[3] ** 2)
 
 
 # TODO: These functions.

@@ -246,6 +246,9 @@ class NewPlotDialog(PySide6.QtWidgets.QDialog):
                     if label[-5:] == "[rad]":
                         label = label[:-5] + "[deg]"
                         var = np.rad2deg(var)
+                    if label[-7:] == "[rad/s]":
+                        label = label[:-7] + "[deg/s]"
+                        var = np.rad2deg(var)
 
                     if label not in (vars.keys()):
                         vars[label] = {}
