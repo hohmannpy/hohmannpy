@@ -212,6 +212,7 @@ class UniversalVariablePropagator(base.Propagator):
 
         return fdot_func, gdot_func
 
+    # TODO: Provide derivative to speed this up.
     def _kepler_equation(
             self,
             inverse_sm_axis: float,

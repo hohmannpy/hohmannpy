@@ -61,7 +61,7 @@ def quaternion_2_dcm(q: quaternions.Quaternion):
        A (3, 3) DCM which rotates vectors by the provided quaternion.
     """
 
-    q = q / quaternions.norm(q)
+    q = q / quaternions.quaternion_norm(q)
     dcm = np.array(
         [
             [1 - 2 * (q[2] ** 2 + q[3] ** 2), 2 * (q[1] * q[2] - q[0] * q[3]), 2 * (q[1] * q[3] + q[0] * q[2])],
@@ -74,8 +74,17 @@ def quaternion_2_dcm(q: quaternions.Quaternion):
 
 
 # TODO: These functions.
+def vec_2_dcm(vec1: np.ndarray, vec2: np.ndarray, vec3: np.ndarray):
+    pass
+
+
 def dcm_2_euler(dcm: np.ndarray):
     pass
 
+
 def dcm_2_quaternion(dcm: np.ndarray):
+    pass
+
+
+def dcm_2_vec(dcm: np.ndarray):
     pass
