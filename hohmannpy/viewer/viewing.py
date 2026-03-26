@@ -59,11 +59,16 @@ class Viewer(PySide6.QtWidgets.QMainWindow):
         tabs = PySide6.QtWidgets.QTabWidget()
         self.setCentralWidget(tabs)
 
-        orbit_viewer = rendering.orbits.OrbitRenderer(self.sim, tabs)
-        gt_viewer = rendering.GroundtrackRenderer(self.sim, tabs)
-        plot_viewer = rendering.PlotsRenderer(self.sim, tabs)
+        orbit_viewer = rendering.OrbitRenderer(self.sim, tabs)
         tabs.addTab(orbit_viewer, "Orbit")
+        if sim.include_rotation:
+            attitude_viewer = rendering.ProximityRenderer(self.sim, tabs)
+            tabs.addTab(attitude_viewer, "Proximity")
+        else:
+            attitude_viewer = None
+        gt_viewer = rendering.GroundtrackRenderer(self.sim, tabs)
         tabs.addTab(gt_viewer, "Groundtrack")
+        plot_viewer = rendering.PlotsRenderer(self.sim, tabs)
         tabs.addTab(plot_viewer, "Data Visualizer")
 
         # SPACE pauses the sim using Qt signal/slot functionality. Linkage to orbit_viewer is arbitrary, it could have
@@ -108,6 +113,7 @@ class Viewer(PySide6.QtWidgets.QMainWindow):
         # Store references to all the child widgets of the application in a dict.
         self.elements = {
             "orbit" : orbit_viewer,
+            "attitude" : attitude_viewer,
             "groundtrack" : gt_viewer,
             "plots" : plot_viewer,
             "toolbar" : toolbar,
@@ -449,9 +455,11 @@ class ViewerManager:
             satellites,
             initial_global_time,
             final_global_time,
-            step_size
+            step_size,
+            include_rotation
     ):
         self.satellites = satellites
+        self.include_rotation = include_rotation
 
         self.gui = None
 

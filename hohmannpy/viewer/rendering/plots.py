@@ -128,7 +128,7 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
         """
 
         # Don't render if this tab isn't visible.
-        if self.tabs.currentIndex() != 2:
+        if self.tabs.currentIndex() != self.tabs.indexOf(self):
             return
 
         # For each plot, clamp the time axis to only display data points in the current horizon. No special splining

@@ -183,7 +183,7 @@ class OrbitRenderer(PySide6.QtWidgets.QWidget):
         """
 
         # Don't render if this tab isn't visible.
-        if self.tabs.currentIndex() != 0:
+        if self.tabs.currentIndex() != self.tabs.indexOf(self):
             self._canvas.request_draw(self.animate)  # Buffer a recursive call to start rendering loop.
             return
 

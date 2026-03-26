@@ -335,11 +335,26 @@ class Mission:
         if not any(isinstance(logger, logging.TimeLogger) for logger in loggers):
             raise AttributeError("No TimeLogger stored for this mission, can not generate trajectories for display.")
 
+        # Only enable attitude rendering if _include_rotation was set to True and an AttitudeLogger was included.
+        if self._include_rotation:
+            try:
+                if not any(isinstance(logger, logging.AttitudeLogger) for logger in loggers):
+                    raise AttributeError(
+                        "No AttitudeLogger stored for this mission, can not process rotational dynamics for display."
+                        "Loading HohmannPy Viewer without them as a fallback.")
+                include_rotation = True
+            except AttributeError as exception:
+                print(exception)
+                include_rotation = False
+        else:
+            include_rotation = False
+
         sim_manager = viewing.ViewerManager(
             self.satellites,
             self._initial_global_time,
             self._final_global_time,
-            self._propagator._step_size
+            self._propagator._step_size,
+            include_rotation=include_rotation
         )
         sim_manager.run()
 

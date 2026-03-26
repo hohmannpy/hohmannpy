@@ -18,7 +18,9 @@ dependencies = [
     "pylinalg",
     "rendercanvas",
     "pygfx",
-    "pyside6"
+    "pyside6",
+    "dracopy",
+    "gltflib"
 ]
 
 [tool.setuptools.packages.find]
