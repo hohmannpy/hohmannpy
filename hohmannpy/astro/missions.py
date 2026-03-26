@@ -8,7 +8,8 @@ import time as python_time
 import pandas as pd
 import numpy as np
 
-from . import propagation, perturbations, time, logging, spacecraft, maneuvers
+from . import propagation, perturbations, time, spacecraft, maneuvers
+from .. import logging
 from ..viewer import viewing
 
 
@@ -27,6 +28,8 @@ class Mission:
         The Gregorian date and UT1 time to start the mission at.
     final_global_time : :class:`~hohmannpy.astro.Time`
         The Gregorian date and UT1 time to end the mission at.
+    include_rotation : bool
+        If rotational dynamics should be simulated alongside translational ones.
     loggers : list[:class:`~hohmannpy.astro.Logger`]
         Loggers determine which data to record for each satellite during propagation. To see what data each logger
         records, check the attributes labeled ``..._history`` in their respective documentation. For example,
@@ -37,6 +40,8 @@ class Mission:
     perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
         Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are added
         a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
+    perturbing_torques : list[:class:`~hohmannpy.astro.Perturbation`]
+        Perturbations to add to the mission to increase the fidelity of rotational simulation.
     verbose: bool
         Whether to print information about propagation.
     cores : int
@@ -54,35 +59,42 @@ class Mission:
             satellites: list[spacecraft.Satellite],
             initial_global_time: time.Time,
             final_global_time: time.Time,
+            include_rotation: bool = False,
             loggers: Optional[list[logging.Logger]] = None,
             propagator: Optional[propagation.base.Propagator] = None,
             perturbing_forces: Optional[list[perturbations.Perturbation]] = None,
+            perturbing_torques: Optional[list[perturbations.Perturbation]] = None,
             verbose: bool = True,
             cores: int = 1
     ):
         # Instantiate all the passed-in attributes.
-        self._perturbing_forces: list[perturbations.Perturbation] = perturbing_forces
-        self._initial_global_time: time.Time = initial_global_time
-        self._final_global_time: time.Time = final_global_time
-        self._verbose: bool = verbose
-        self._cores: int = cores
+        self._perturbing_forces = perturbing_forces
+        self._perturbing_torques = perturbing_torques
+        self._initial_global_time = initial_global_time
+        self._final_global_time = final_global_time
+        self._verbose = verbose
+        self._cores = cores
+        self._include_rotation = include_rotation
 
         # If the user did not pass in a propagator we need to assign one for them. If no perturbations are used we can
         # use the best-in-class Keplerian propagator, UniversalVariablePropagator(). If a perturbation is used instead
         # use CowellPropagator() to account for non-Keplerian effects.
         if propagator is None:
             if self._perturbing_forces is None:
-                self._propagator: propagation.base.Propagator = (
+                self._propagator = (
                     propagation.universal_variable.UniversalVariablePropagator()
                 )
             else:
-                self._propagator: propagation.base.Propagator = propagation.cowell.CowellPropagator()
+                self._propagator = propagation.cowell.CowellPropagator()
         else:
-            self._propagator: propagation.base.Propagator = propagator
+            self._propagator = propagator
 
         # If the user did not pass in a logger default to recording the time and state.
         if loggers is None:
-            loggers = [logging.StateLogger()]
+            loggers = [logging.TimeLogger(), logging.StateLogger()]
+
+            if self._include_rotation:
+                loggers.append(logging.AttitudeLogger())
 
         # Setup satellite data logging. For easy access the satellites are stored in a dictionary where their name is
         # the key and the object itself is the value. Each satellite is initialized with a logger attribute set to None,
@@ -91,6 +103,24 @@ class Mission:
         for satellite in satellites:
             self.satellites[satellite.name] = satellite
             satellite.loggers = copy.deepcopy(loggers)
+
+            # Make sure if rotation is enabled the satellite has an inertia matrix.
+            if self._include_rotation:
+                if satellite.inertia is None:
+                    raise AttributeError("If rotational dynamics are enabled all satellites must have a value for the "
+                                         "attribute 'inertia'.")
+                if satellite.starting_orientation is None:
+                    raise AttributeError("If rotational dynamics are enabled all satellites must have a value for the "
+                                         "attribute 'starting_orientation'.")
+
+                # Safeguard to ensure Keplerian propagators are not used for orientation simulation.
+                if ((isinstance(self._propagator, propagation.KeplerPropagator) or
+                     isinstance(self._propagator, propagation.UniversalVariablePropagator))
+                        and not isinstance(self._propagator, propagation.EnckePropagator)
+                ):
+                    raise TypeError(
+                        f"Propagators of type {self._propagator} are not supported for rotational dynamics. Please "
+                        f"use either CowellPropagator or EnckePropagator instead with a timestep of at most 1 second.")
 
             # Some satellites may be passed in with maneuvers scheduled. If these maneuvers are set to fire at times
             # determined by Time objects, we now convert those to relative seconds since mission start. This couldn't be
@@ -111,7 +141,7 @@ class Mission:
                     if isinstance(event[2].end_time, time.Time):
                         event[2].end_time = (event[2].end_time.julian_date - initial_global_time.julian_date) * 86400
 
-                        # Safeguard to ensure Keplerian propagators are not used with continuous.rst burns.
+                        # Safeguard to ensure Keplerian propagators are not used with continuous burns.
                         if ((isinstance(self._propagator, propagation.KeplerPropagator) or
                              isinstance(self._propagator, propagation.UniversalVariablePropagator))
                                 and not isinstance(self._propagator, propagation.EnckePropagator)
@@ -137,6 +167,15 @@ class Mission:
             # want to make sure that if a perturbation is enabled that the user has input value for all the needed
             # optional parameters for each satellite.
             if self._perturbing_forces is not None:
+                # Safeguard to ensure Keplerian propagators are not used with perturbations.
+                if ((isinstance(self._propagator, propagation.KeplerPropagator) or
+                     isinstance(self._propagator, propagation.UniversalVariablePropagator))
+                        and not isinstance(self._propagator, propagation.EnckePropagator)
+                ):
+                    raise TypeError(
+                        f"Propagators of type {self._propagator} are not supported for perturbations. Please use either "
+                        f"CowellPropagator or EnckePropagator instead.")
+
                 for perturbation in self._perturbing_forces:
                     if isinstance(perturbation, perturbations.AtmosphericDrag) and satellite.ballistic_coeff is None:
                         raise AttributeError("If AtmosphericDrag is enabled as a perturbation all satellites must have "
@@ -193,6 +232,7 @@ class Mission:
                 satellites=self.satellites,
                 runtime=runtime,
                 perturbing_forces=self._perturbing_forces,
+                include_rotation=self._include_rotation
             )
 
         # Multicore case. First, calculate how many satellites should be distributed to each core. These are then split

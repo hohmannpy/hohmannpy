@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING, Optional, Union
 import numpy as np
 import scipy as sp
 
-from . import orbits, logging, maneuvers
+from . import orbits, maneuvers
+from .. import logging
+from ..dynamics import attitude
 
 if TYPE_CHECKING:
     from . import time
@@ -20,21 +22,26 @@ class Satellite:
     name : str
         Unique identifier of the spacecraft. Repeats are not allowed.
     starting_orbit : :class:`~hohmannpy.astro.Orbit`
-        The orbit the spacecraft is in at the start of the perturbation.
+        The orbit the spacecraft is in at the start of the mission.
+    starting_orbit : Optional[:class:`~hohmannpy.dynamics.Orientation`]
+        The orientation of the spacecraft at the start of the mission.
     color: str
         The color of the orbit and spacecraft to display in renderings.
     burns : Optional[list[Union[:class:`~hohmannpy.astro.ImpulsiveBurn`, :class:`~hohmannpy.astro.ContinuousBurn`]]]
         The set of impulsive and continuous.rst burns to schedule for this spacecraft.
-    mass: float
+    mass: Optional[float]
         Mass of the spacecraft in :math:`kg`. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
-    ballistic_coeff: float
+    inertia : Optional[np.ndarray]
+        The rotational inertia of the spacecraft stored in a (3, 3) numpy array. The coordination of this matrix
+        is up to the user. A common choice is the principal axes of the spacecraft.
+    ballistic_coeff: Optional[float]
         Dimensionless parameter proportional to the drag effects experienced by a spacecraft. Needed for missions where
         the perturbation :class:`~hohmannpy.astro.AtmosphericDrag` is enabled.
-    mean_reflective_area : float
+    mean_reflective_area : Optional[float]
         Average area exposed to solar radiation pressure in :math:`m^2`. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
-    reflectivity : float
+    reflectivity : Optional[float]
         Dimensionless parameter proportional to how much solar radiation is reflected by the ``mean_reflective_area``.
         0 = transparent, 1 = full absorption, and 2 = full reflection. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
@@ -53,16 +60,19 @@ class Satellite:
         is filled in by the ``__init__()`` of ``Mission``.
     color: str
         The color of the orbit and spacecraft to display in renderings.
-    mass: float
+    mass: Optional[float]
         Mass of the spacecraft in :math:`kg`. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
-    ballistic_coeff: float
+    inertia : Optional[np.ndarray]
+        The rotational inertia of the spacecraft stored in a (3, 3) numpy array. The coordination of this matrix
+        is up to the user. A common choice is the principal axes of the spacecraft.
+    ballistic_coeff: Optional[float]
         Dimensionless parameter proportional to the drag effects experienced by a spacecraft. Needed for missions where
         the perturbation :class:`~hohmannpy.astro.AtmosphericDrag` is enabled.
-    mean_reflective_area : float
+    mean_reflective_area : Optional[float]
         Average area exposed to solar radiation pressure in :math:`m^2`. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
-    reflectivity : float
+    reflectivity : Optional[float]
         Dimensionless parameter proportional to how much solar radiation is reflected by the ``mean_reflective_area``.
         0 = transparent, 1 = full absorption, and 2 = full reflection. Needed for missions where the perturbation
         :class:`~hohmannpy.astro.SolarRadiation` is enabled.
@@ -77,16 +87,19 @@ class Satellite:
             self,
             name: str,
             starting_orbit: orbits.Orbit,
+            starting_orientation: Optional[attitude.Orientation] = None,
             color: str = "#FF073A",
             burns: Optional[list[Union[maneuvers.ImpulsiveBurn, maneuvers.ContinuousBurn]]] = None,
-            mass: float = None,
-            ballistic_coeff: float = None,
-            mean_reflective_area: float = None,
-            reflectivity: float = None
+            mass: Optional[float] = None,
+            inertia: Optional[np.ndarray] = None,
+            ballistic_coeff: Optional[float] = None,
+            mean_reflective_area: Optional[float] = None,
+            reflectivity: Optional[float] = None
     ):
-        self.name: str = name
-        self.starting_orbit: orbits.Orbit = starting_orbit
-        self.color: str = color
+        self.name = name
+        self.starting_orbit = starting_orbit
+        self.starting_orientation = starting_orientation
+        self.color = color
 
         # Form a list of all events that will need mandatory propagation steps. Sorting will then take place back in the
         # Mission class.
@@ -103,13 +116,15 @@ class Satellite:
                 self._num_events += 2
 
         # Perturbation-specific parameters.
-        self.mass: float = mass
-        self.ballistic_coeff: float = ballistic_coeff
-        self.mean_reflective_area: float = mean_reflective_area
-        self.reflectivity: float = reflectivity
+        self.mass = mass
+        self.inertia = inertia
+        self.ballistic_coeff = ballistic_coeff
+        self.mean_reflective_area = mean_reflective_area
+        self.reflectivity = reflectivity
 
         # Other parameters.
         self.orbit: orbits.Orbit = copy.deepcopy(starting_orbit)  # This will be updated over time by the propagator.
+        self.orientation: attitude.Orientation = copy.deepcopy(starting_orientation)  # Same as above.
         self.loggers: Optional[list[logging.Logger]] = None  # Filled in by the __init__() of Mission.
 
     def __getattr__(self, name):

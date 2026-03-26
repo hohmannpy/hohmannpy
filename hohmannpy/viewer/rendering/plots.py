@@ -4,7 +4,8 @@ import PySide6.QtCore
 import PySide6.QtGui
 import numpy as np
 
-from ...astro import logging, conversions
+from ...astro import conversions
+from ... import logging
 
 
 class PlotsRenderer(PySide6.QtWidgets.QWidget):

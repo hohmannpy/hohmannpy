@@ -65,7 +65,7 @@ class Propagator(ABC):
         # Propagators store a variety of variables in dictionaries indexed by satellite name. Store these variables now.
         for name, satellite in self._satellites.items():
             for logger in satellite.loggers:  # Also set up the loggers while we're at it.
-                logger.setup(initial_orbit=satellite.orbit, timesteps=self._timesteps, events=satellite._num_events)
+                logger.setup(initial_obj=satellite.orbit, timesteps=self._timesteps, events=satellite._num_events)
 
             self._set_initial_conditions(satellite)
             self._active_burns[name] = []
@@ -159,7 +159,7 @@ class Propagator(ABC):
         """
 
         for logger in satellite.loggers:
-            logger.log(current_orbit=satellite.orbit)
+            logger.log(obj=satellite.orbit)
 
     @abstractmethod
     def _set_initial_conditions(self, satellite: spacecraft.Satellite):

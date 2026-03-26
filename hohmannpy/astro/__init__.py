@@ -19,10 +19,6 @@ from .perturbations import (
 )
 
 # Loggers.
-from .logging import (
-    Logger, StateLogger, ClassicalElementsLogger,
-    EquinoctialElementsLogger, EccentricAnomalyLogger, UniversalVariableLogger
-)
 
 
 # Other libraries

@@ -7,7 +7,8 @@ import numpy as np
 import scipy as sp
 
 from ...dynamics import dcms
-from .. import propagation, time, spacecraft, logging, orbits
+from .. import propagation, time, spacecraft, orbits
+from ... import logging
 from . import base
 
 
