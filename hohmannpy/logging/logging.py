@@ -200,7 +200,7 @@ class ClassicalElementsLogger(Logger):
     """
 
     labels = [
-        "Semi-Axis Axis [m]", "Semi-Latus Rectum [m]",
+        "Semi-Major Axis [m]", "Semi-Latus Rectum [m]",
         "Eccentricity",
         "Inclination [rad]", "RAAN [rad]", "Argument of Periapsis [rad]",
         "True Anomaly [rad]",
