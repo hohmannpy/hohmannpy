@@ -74,7 +74,7 @@ def quaternion_2_dcm(q: quaternions.Quaternion) -> np.ndarray:
 
 def vecs_2_dcm(vec1: np.ndarray, vec2: np.ndarray, vec3: np.ndarray)-> np.ndarray:
     r"""
-    Generate a direction cosine matrix (DCM) from a set of three ORTHOGONAL vectors.
+    Generate a direction cosine matrix (DCM) from a set of three ORTHOGONAL COLUMN vectors.
 
     Parameters
     ----------
@@ -124,13 +124,13 @@ def dcm_2_euler(dcm: np.ndarray, sequence: str) -> tuple[float, float, float]:
 
     match sequence:
         case "321":
-            euler3 = np.arctan2(dcm[1, 2], dcm[1, 1])
-            euler2 = np.arctan2(dcm[2, 3], dcm[3, 3])
+            euler3 = np.arctan2(dcm[0, 1], dcm[0, 0])
+            euler2 = np.arctan2(dcm[1, 2], dcm[2, 2])
             euler1 = float(np.arcsin(-dcm[1, 3]))
         case "313":
-            euler3 = np.arctan2(dcm[3, 1], dcm[3, 2])
-            euler2 = np.arctan2(dcm[1, 3], -dcm[2, 3])
-            euler1 = np.arccos(dcm[3, 3])
+            euler3 = np.arctan2(dcm[2, 0], dcm[2, 1])
+            euler2 = np.arctan2(dcm[0, 2], -dcm[1, 2])
+            euler1 = np.arccos(dcm[2, 2])
         case _:
             raise NotImplementedError(f"Recovery of Euler angles for the {sequence} sequence is not supported.")
 
@@ -162,7 +162,7 @@ def quaternion_2_euler(q: quaternions.Quaternion, sequence: str) -> tuple[float,
 
 def vecs_2_euler(vec1: np.ndarray, vec2: np.ndarray, vec3: np.ndarray, sequence: str) -> tuple[float, float, float]:
     r"""
-    Generate the euler1-euler2-euler3 Euler angle sequence from a set of three ORTHOGONAL vectors.
+    Generate the euler1-euler2-euler3 Euler angle sequence from a set of three ORTHOGONAL COLUMN vectors.
 
     Parameters
     ----------
@@ -204,30 +204,30 @@ def dcm_2_quaternion(dcm: np.ndarray):
     trace = dcm.trace()
     if trace > 0:
         q0 = np.sqrt((1 + trace) / 4)
-        q1 = (dcm[2, 3] - dcm[3, 2]) / (4 * q0)
-        q2 = (dcm[3, 1] - dcm[1, 3]) / (4 * q0)
-        q3 = (dcm[1, 2] - dcm[2, 1]) / (4 * q0)
-    elif dcm[1, 1] > dcm[2, 2] and dcm[1, 1] > dcm[3, 3]:
-        q0 = np.sqrt((1 + dcm[1, 1] - dcm[2, 2] - dcm[3, 3]) / 4)
-        q1 = (dcm[2, 3] - dcm[3, 2]) / (4 * q0)
-        q2 = (dcm[1, 2] + dcm[2, 1]) / (4 * q0)
-        q3 = (dcm[3, 1] + dcm[1, 3]) / (4 * q0)
-    elif dcm[2, 2] > dcm[3, 3]:
-        q0 = np.sqrt((1 - dcm[1, 1] + dcm[2, 2] - dcm[3, 3]) / 4)
-        q1 = (dcm[3, 1] - dcm[1, 3]) / (4 * q0)
-        q2 = (dcm[1, 2] + dcm[2, 1]) / (4 * q0)
-        q3 = (dcm[2, 3] + dcm[3, 2]) / (4 * q0)
-    else:
-        q0 = np.sqrt((1 - dcm[1, 1] - dcm[2, 2] + dcm[3, 3]) / 4)
         q1 = (dcm[1, 2] - dcm[2, 1]) / (4 * q0)
-        q2 = (dcm[3, 1] + dcm[1, 3]) / (4 * q0)
-        q3 = (dcm[2, 3] + dcm[3, 2]) / (4 * q0)
+        q2 = (dcm[2, 0] - dcm[0, 2]) / (4 * q0)
+        q3 = (dcm[0, 1] - dcm[1, 0]) / (4 * q0)
+    elif dcm[1, 1] > dcm[2, 2] and dcm[1, 1] > dcm[3, 3]:
+        q0 = np.sqrt((1 + dcm[0, 0] - dcm[1, 1] - dcm[2, 2]) / 4)
+        q1 = (dcm[1, 2] - dcm[2, 1]) / (4 * q0)
+        q2 = (dcm[0, 1] + dcm[1, 0]) / (4 * q0)
+        q3 = (dcm[2, 0] + dcm[0, 2]) / (4 * q0)
+    elif dcm[2, 2] > dcm[3, 3]:
+        q0 = np.sqrt((1 - dcm[0, 0] + dcm[1, 1] - dcm[2, 2]) / 4)
+        q1 = (dcm[2, 0] - dcm[0, 2]) / (4 * q0)
+        q2 = (dcm[0, 1] + dcm[1, 0]) / (4 * q0)
+        q3 = (dcm[1, 2] + dcm[2, 1]) / (4 * q0)
+    else:
+        q0 = np.sqrt((1 - dcm[0, 0] - dcm[1, 1] + dcm[2, 2]) / 4)
+        q1 = (dcm[0, 1] - dcm[1, 0]) / (4 * q0)
+        q2 = (dcm[2, 0] + dcm[0, 2]) / (4 * q0)
+        q3 = (dcm[1, 2] + dcm[2, 1]) / (4 * q0)
 
     return quaternions.Quaternion((q0, q1, q2, q3))
 
 def vecs_2_quaternion(vec1: np.ndarray, vec2: np.ndarray, vec3: np.ndarray) -> np.ndarray:
     r"""
-    Generate a quaternion from a set of three ORTHOGONAL vectors.
+    Generate a quaternion from a set of three ORTHOGONAL COLUMN vectors.
 
     Parameters
     ----------
@@ -249,7 +249,7 @@ def vecs_2_quaternion(vec1: np.ndarray, vec2: np.ndarray, vec3: np.ndarray) -> n
 
 def euler_2_quaternion(euler1: float, euler2: float, euler3: float, sequence: str) -> quaternions.Quaternion:
     r"""
-    Generate a quaternion from a euler1-euler2-euler3 Euler angle sequence.
+    Generate a quaternion from the euler1-euler2-euler3 Euler angle sequence.
 
     Parameters
     ----------

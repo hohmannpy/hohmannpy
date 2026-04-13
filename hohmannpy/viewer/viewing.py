@@ -12,6 +12,7 @@ from . import rendering, toolbars, dockers, tables
 
 
 # TODO:
+#   - MAJOR BUG: For short (sub-one orbit) trajectories satellite moves past trajectory line before sim resets.
 #   - (Post-alpha) Hovering over satellite displays name, clicking focuses it.
 #   - (Post-alpha) FPS tracking on all tabs.
 #   - (Post-alpha) Add an option to display the ECI basis in the orbit viewer and latitude and longitude lines in the
@@ -479,18 +480,20 @@ class ViewerManager:
         self.horizon_display_mode = "period"
         self.custom_horizon: int = 24 * 3600  # Defaults to one day.
 
-        self.splines = {"positions" : {}, "velocities" : {}}
+        self.splines = {"positions" : {}, "velocities" : {}, "attitudes" : {}}
 
         # Generate the data splines. Note that as a result of impulsive burns there may be multiple data entries at the
         # same time point. Detect this and slightly increment them or splining will throw an error.
         for name, satellite in self.satellites.items():
             times = satellite.time_history
+            positions = satellite.position_history.T / 1000
+            velocities = satellite.velocity_history.T / 1000
+
             for i in range(1, times.shape[1]):
                 if times[0, i] <= times[0, i - 1]:
                     times[0, i] = times[0, i - 1] + 1e-9
-            positions = satellite.position_history.T / 1000
-            velocities = satellite.velocity_history.T / 1000
             times = times.squeeze()
+
             self.splines["positions"][name] = (
                 sp.interpolate.make_interp_spline(
                     times,
@@ -498,6 +501,16 @@ class ViewerManager:
                     k=3
                 )
             )
+
+            if self.include_rotation:
+                attitudes = satellite.quaternion_history.T
+                self.splines["attitudes"][name] = (
+                    sp.interpolate.make_interp_spline(
+                        times,
+                        attitudes,
+                        k=3
+                    )
+                )
 
             if len([x for x in satellite._events if x[1] == "impulsive"]) > 0:
                 jump_times = [x[0] for x in satellite._events if x[1] == "impulsive"]

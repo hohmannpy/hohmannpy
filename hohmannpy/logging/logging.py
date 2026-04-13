@@ -307,7 +307,7 @@ class EquinoctialElementsLogger(Logger):
 
     labels = [
         "e-component 1", "e-component 2",
-        "n-component 2", "n-component 2",
+        "n-component 1", "n-component 2",
     ]
     attributes = [
         "e_component1_history",

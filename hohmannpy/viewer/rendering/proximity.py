@@ -9,7 +9,7 @@ import pygfx as gfx
 import numpy as np
 import pylinalg as la
 
-from ...astro import conversions
+from ...dynamics import dcms, quaternions
 
 
 class ProximityRenderer(PySide6.QtWidgets.QWidget):
@@ -63,6 +63,9 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
         self.objects["earth"] = gfx.Mesh(
             gfx.sphere_geometry(radius=6371, width_segments=128, height_segments=64),
             earth_mat
+        )
+        quat = la.quat_from_euler(
+            (np.pi / 2, 0, 0), order="XYZ"
         )
         self.base_earth_rotation = la.quat_from_euler(
             (np.pi / 2, 0, 0), order="XYZ"
@@ -137,7 +140,9 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
             target = self.sim.splines["positions"][self.sim.focus](self.sim.sim_time)
 
         self.model.local.position = tuple(target)
-        
+
+        if self.sim.focus is not None:
+            self.model.local.rotation = self.sim.splines["attitudes"][self.sim.focus](self.sim.sim_time)
 
         # Must update before render() call.
         self._scene.local.position = tuple(-target)

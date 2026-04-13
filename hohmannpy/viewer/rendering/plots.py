@@ -86,6 +86,15 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
         y_axis.setTitleText(f"{satellite_id}: {var_label}")
         chart.setProperty("satellite_id", satellite_id)
 
+        # TODO: This fix is broken bc auto axis BS need to investigate.
+        # Need this or plot bugs out when the y-value is constant.
+        ymin = float(np.min(var))
+        ymax = float(np.max(var))
+        print(ymin, ymax)
+        if ymin == ymax:
+            pad = 1.0 if ymin == 0.0 else 0.01 * abs(ymin)
+            y_axis.setRange(ymin - pad, ymax + pad)
+
         plot = PySide6.QtCharts.QChartView(chart)
         plot.setRenderHint(PySide6.QtGui.QPainter.Antialiasing)  # Need or lines are super jagged.
         plot.setMinimumSize(500, 250)
@@ -229,7 +238,7 @@ class NewPlotDialog(PySide6.QtWidgets.QDialog):
                         elif 3 <= index < 6:
                             row = index - 3
                             index = 1
-                    if isinstance(logger, logging.AttitudeLogger):
+                    elif isinstance(logger, logging.AttitudeLogger):
                         if 0 <= index < 4:
                             row = index
                             index = 0

@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from . import quaternions
 
 
-# TODO: Documentation.
+# TODO: Documentation and all functions involving the body frame.
 def eci_2_ecef(vec: np.ndarray, gmst: float) -> np.ndarray:
     return dcms.euler_2_dcm(gmst, 3) @ vec
 
@@ -19,14 +19,9 @@ def eci_2_rtn(vec: np.ndarray, raan: float, inclination: float, argp: float, tru
     return perifocal_2_rtn(eci_2_perifocal(vec, raan, inclination, argp), true_anomaly)
 
 def eci_2_body(
-        vec: np.ndarray,
-        raan: float,
-        argp: float,
-        inclination: float,
-        true_anomaly: float,
         quaternion: quaternions.Quaternion,
 ) -> np.ndarray:
-    return rtn_2_body(eci_2_rtn(vec, raan, inclination, argp, true_anomaly), quaternion)
+    pass
 
 def eci_2_heliocentric(vec: np.ndarray) -> np.ndarray:
     earth_tilt = np.deg2rad(-23.439291115)
@@ -58,13 +53,13 @@ def body_2_eci(
         true_anomaly: float,
         quaternion: quaternions.Quaternion,
 ) -> np.ndarray:
-    return perifocal_2_eci(body_2_perifocal(vec, quaternion, true_anomaly), raan, inclination, argp)
+    pass
 
 def body_2_perifocal(vec, quaternion: quaternions.Quaternion, true_anomaly: float) -> np.ndarray:
-    return rtn_2_perifocal(body_2_rtn(vec, quaternion), true_anomaly)
+    pass
 
 def body_2_rtn(vec: np.ndarray, quaternion: quaternions.Quaternion) -> np.ndarray:
-    return dcms.quaternion_2_dcm(quaternion).T @ vec
+    pass
 
 def rtn_2_eci(vec: np.ndarray, raan: float, inclination: float, argp: float, true_anomaly: float) -> np.ndarray:
     return perifocal_2_eci(rtn_2_perifocal(vec, true_anomaly), raan, inclination, argp)
@@ -73,7 +68,7 @@ def rtn_2_perifocal(vec: np.ndarray, true_anomaly: float) -> np.ndarray:
     return dcms.euler_2_dcm(true_anomaly, 3).T @ vec
 
 def rtn_2_body(vec: np.ndarray, quaternion: quaternions.Quaternion) -> np.ndarray:
-    return dcms.quaternion_2_dcm(quaternion) @ vec
+    pass
 
 def heliocentric_2_eci(vec: np.ndarray) -> np.ndarray:
     earth_tilt = np.deg2rad(-23.439291115)
