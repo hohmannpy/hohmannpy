@@ -26,3 +26,11 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["hohmannpy*"]
+
+[tool.setuptools.package-data]
+"hohmannpy.resources" = [
+    "*.csv",
+    "gfx/*.png",
+    "gfx/skybox/*.png",
+    "gfx/models/*.glb"
+]

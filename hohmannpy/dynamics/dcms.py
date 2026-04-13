@@ -88,3 +88,18 @@ def dcm_2_quaternion(dcm: np.ndarray):
 
 def dcm_2_vec(dcm: np.ndarray):
     pass
+
+def vec_2_quaternion(vec1: np.ndarray, vec2: np.ndarray, vec3: np.ndarray):
+    pass
+
+def quaternion_2_vec(q: quaternions.Quaternion):
+    pass
+
+def euler_2_vec():
+    pass
+
+def quaternion_2_euler():
+    pass
+
+def vec_2_euler():
+    pass

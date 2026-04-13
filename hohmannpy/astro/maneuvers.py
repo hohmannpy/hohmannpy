@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import Any, Union, Callable, Optional, TYPE_CHECKING
 
 import numpy as np
 import scipy as sp
@@ -140,7 +140,7 @@ class ContinuousBurn(perturbations.Perturbation):
             self,
             start_time: Any[float, time.Time],
             end_time: Any[float, time.Time],
-            masses: Optional[Any[np.ndarray, Callable]] = None,
+            masses: Optional[Union[np.ndarray, Callable]] = None,
             inertial: bool = False,
     ):
         super().__init__()
@@ -249,7 +249,7 @@ class ConstantContinuousBurn(ContinuousBurn):
             start_time: Any[float, time.Time],
             end_time: Any[float, time.Time],
             thrust: np.ndarray,
-            masses: Optional[Any[np.ndarray, Callable]] = None,
+            masses: Optional[Union[np.ndarray, Callable]] = None,
             inertial: bool = False,
     ):
         super().__init__(start_time, end_time, masses, inertial)
@@ -308,7 +308,7 @@ class LookupContinuousBurn(ContinuousBurn):
             start_time: Any[float, time.Time],
             end_time: Any[float, time.Time],
             thrusts: np.ndarray,
-            masses: Optional[Any[np.ndarray, Callable]] = None,
+            masses: Optional[Union[np.ndarray, Callable]] = None,
             inertial: bool = False,
     ):
         super().__init__(start_time, end_time, masses, inertial)
@@ -373,7 +373,7 @@ class FunctionContinuousBurn(ContinuousBurn):
             start_time: Any[float, time.Time],
             end_time: Any[float, time.Time],
             thrust_function: Callable,
-            masses: Optional[Any[np.ndarray, Callable]] = None,
+            masses: Optional[Union[np.ndarray, Callable]] = None,
             inertial: bool = False,
     ):
         super().__init__(start_time, end_time, masses, inertial)

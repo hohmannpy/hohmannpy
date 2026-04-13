@@ -79,12 +79,14 @@ class SolarRadiation(base.Perturbation):
         """
 
         # Get a spline corresponding to the Earth's orbit.
-        earth = spacecraft.Earth(initial_global_time)
+        from .. import celestial  # Stuffed down here to prevent circular imports.
+        earth = celestial.Earth(initial_global_time)
 
         propagator = propagation.KeplerPropagator()
         propagator._propagate(
             satellites={earth.name: earth},
             runtime=(final_global_time.julian_date - initial_global_time.julian_date) * 86400,
+            include_rotation=False
         )
 
         self.earth_orbit_spline = sp.interpolate.make_interp_spline(

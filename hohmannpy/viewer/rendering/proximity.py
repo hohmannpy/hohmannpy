@@ -107,6 +107,7 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
         layout = PySide6.QtWidgets.QVBoxLayout(self)
         layout.addWidget(self._canvas)
 
+    # TODO: Satellite rotation.
     def animate(self):
         """
         One frame of the animation loop.
@@ -136,6 +137,7 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
             target = self.sim.splines["positions"][self.sim.focus](self.sim.sim_time)
 
         self.model.local.position = tuple(target)
+        
 
         # Must update before render() call.
         self._scene.local.position = tuple(-target)
