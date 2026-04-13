@@ -93,12 +93,3 @@ class Quaternion:
 
 def quaternion_norm(quat: Quaternion) -> np.floating:
     return np.sqrt(quat[0] ** 2 + quat[1] ** 2 + quat[2] ** 2 + quat[3] ** 2)
-
-
-# TODO: These functions.
-def quaternion_2_euler(quat: Quaternion):
-    pass
-
-
-def euler_2_quaternion(angles: tuple[float, float, float]):
-    pass
