@@ -86,12 +86,11 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
         y_axis.setTitleText(f"{satellite_id}: {var_label}")
         chart.setProperty("satellite_id", satellite_id)
 
-        # TODO: This fix is broken bc auto axis BS need to investigate.
-        # Need this or plot bugs out when the y-value is constant.
+        # Need this or plot bugs out when the y-value is constant. WARNING: AI slop.
         ymin = float(np.min(var))
         ymax = float(np.max(var))
         print(ymin, ymax)
-        if ymin == ymax:
+        if abs(ymax - ymin) < 1e-9:
             pad = 1.0 if ymin == 0.0 else 0.01 * abs(ymin)
             y_axis.setRange(ymin - pad, ymax + pad)
 
@@ -186,7 +185,24 @@ class PlotsRenderer(PySide6.QtWidgets.QWidget):
                 lower_time = 0
 
             axis_x = chart.axes(PySide6.QtCore.Qt.Horizontal)[0]
+            axis_y = chart.axes(PySide6.QtCore.Qt.Vertical)[0]
             axis_x.setRange(lower_time, upper_time)
+
+            # Need this or plot bugs out when the y-value is constant. WARNING: AI slop.
+            series = chart.series()[0]
+            points = series.pointsVector()
+            visible_y = [p.y() for p in points if lower_time <= p.x() <= upper_time]
+
+            if visible_y:
+                ymin = min(visible_y)
+                ymax = max(visible_y)
+
+                if abs(ymax - ymin) < 1e-9:
+                    pad = 0.01 * max(abs(ymin), 1.0)
+                else:
+                    pad = 0.05 * (ymax - ymin)
+
+                axis_y.setRange(ymin - pad, ymax + pad)
 
 
 class NewPlotDialog(PySide6.QtWidgets.QDialog):
