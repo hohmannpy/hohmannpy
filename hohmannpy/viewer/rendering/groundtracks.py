@@ -64,7 +64,7 @@ class GroundtrackRenderer(PySide6.QtWidgets.QWidget):
         self.positions = {}
         self.dense_times = np.arange(
             0,
-            self.sim.final_sim_time,
+            self.sim.final_sim_time + density,
             density
         )
 

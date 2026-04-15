@@ -12,7 +12,6 @@ from . import rendering, toolbars, dockers, tables
 
 
 # TODO:
-#   - MAJOR BUG: For short (sub-one orbit) trajectories satellite moves past trajectory line before sim resets.
 #   - (Post-alpha) Hovering over satellite displays name, clicking focuses it.
 #   - (Post-alpha) FPS tracking on all tabs.
 #   - (Post-alpha) Add an option to display the ECI basis in the orbit viewer and latitude and longitude lines in the
@@ -20,6 +19,7 @@ from . import rendering, toolbars, dockers, tables
 #   - (Post-alpha) The groundtrack renderer is still a little laggy. Work on ways to improve this.
 #   - (Post-alpha) Laggy when a long trajectory is rendered, need to make step size more dynamic.
 #   - (Post-alpha) Redo variables and docs to use privatization.
+#   - (Post-beta) Fix spacecraft not being shadowed when in eclipse by turning off lighting.
 class Viewer(PySide6.QtWidgets.QMainWindow):
     """
     This is the main QtWidget of the HohmannPy Viewer application. This can be used to visually display a 3D rendering

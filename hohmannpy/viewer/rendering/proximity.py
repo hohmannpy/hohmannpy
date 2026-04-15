@@ -9,8 +9,6 @@ import pygfx as gfx
 import numpy as np
 import pylinalg as la
 
-from ...dynamics import dcms, quaternions
-
 
 class ProximityRenderer(PySide6.QtWidgets.QWidget):
     """
@@ -41,7 +39,6 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
         )  # Add mouse control to camera.
         self._camera.show_pos((0, 0, 0), up=(0, 0, 1))
 
-        # TODO: Add logic to turn off spacecraft lighting when in eclipse.
         # Add some basic objects to the scene - lighting, the Earth, and a background skybox.
         self._scene.add(gfx.AmbientLight(intensity=0.1))
         sunlight = gfx.DirectionalLight(intensity=1.25)
