@@ -29,7 +29,7 @@ class Viewer(PySide6.QtWidgets.QMainWindow):
 
     Parameters
     ----------
-    sim : :class:`hohmannpy.viewer.SimManager`
+    sim : :class:`hohmannpy.viewer.ViewerManager`
         Handles all the time keeping and data handling for the HohmannPy simulation displayed by this HohmannPy Viewer.
 
     Attributes

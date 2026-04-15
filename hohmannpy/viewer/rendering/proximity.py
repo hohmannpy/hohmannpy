@@ -24,6 +24,7 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
         self.initial_gmst = sim.initial_global_time.gmst
         self.objects = {}
         self.tabs = tabs
+        self.old_focus = self.sim.focus
 
         # Set up the internal pygfx rendering via a QRenderWidget. This is placed inside a normal QWidget so that UI
         # can be overlaid on the rendering. The involves the standard pygfx pipeline of canvas -> renderer -> scene ->
@@ -33,7 +34,7 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
         self._scene = gfx.Scene()
 
         self._camera = gfx.PerspectiveCamera(fov=50, aspect=16/9)
-        self._camera.local.position = (10, 0, 0)
+        self._camera.local.position = (15000, 0, 0)
         self._controller = gfx.OrbitController(
             self._camera,
             register_events=self._renderer,
@@ -51,8 +52,8 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
                 importlib.resources.files("hohmannpy.resources").joinpath("models/default.glb")
         ) as path:
             gltf = gfx.load_gltf(path)
-        self.model = gltf.scene
-        self._scene.add(self.model)
+        self.objects["model"] = gltf.scene
+        self._scene.add(self.objects["model"])
 
         earth_mat = gfx.MeshPhongMaterial(shininess=5)
         with importlib.resources.files("hohmannpy.resources").joinpath("gfx/earth_texture_map_high_res.jpg").open("rb") as f:
@@ -63,9 +64,6 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
         self.objects["earth"] = gfx.Mesh(
             gfx.sphere_geometry(radius=6371, width_segments=128, height_segments=64),
             earth_mat
-        )
-        quat = la.quat_from_euler(
-            (np.pi / 2, 0, 0), order="XYZ"
         )
         self.base_earth_rotation = la.quat_from_euler(
             (np.pi / 2, 0, 0), order="XYZ"
@@ -110,7 +108,6 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
         layout = PySide6.QtWidgets.QVBoxLayout(self)
         layout.addWidget(self._canvas)
 
-    # TODO: Satellite rotation.
     def animate(self):
         """
         One frame of the animation loop.
@@ -139,14 +136,26 @@ class ProximityRenderer(PySide6.QtWidgets.QWidget):
         else:
             target = self.sim.splines["positions"][self.sim.focus](self.sim.sim_time)
 
-        self.model.local.position = tuple(target)
+        self.objects["model"].local.position = tuple(target)
 
         if self.sim.focus is not None:
-            self.model.local.rotation = self.sim.splines["attitudes"][self.sim.focus](self.sim.sim_time)
+            self.objects["model"].local.rotation = self.sim.splines["attitudes"][self.sim.focus](self.sim.sim_time)
 
         # Must update before render() call.
         self._scene.local.position = tuple(-target)
-        self._camera.show_pos((0, 0, 0), up=(0, 0, 1))
+
+        # Move camera location so that if the focus is the Earth it is properly zoomed out.
+        if self.sim.focus != self.old_focus:
+            if self.old_focus is None:
+                radial_vec = (
+                        np.array(self.objects["model"].local.position) - np.array(self.objects["earth"].local.position)
+                )
+                radial_uvec = radial_vec / np.linalg.norm(radial_vec)
+                self._camera.local.position = tuple(10 * radial_uvec)
+            if self.sim.focus is None:
+                self._camera.local.position = (15000, 0, 0)
+            self.old_focus = self.sim.focus
+        self._camera.show_pos(self.objects["earth"].local.position, up=(0, 0, 1))
 
         self._renderer.render(self._scene, self._camera)
         self._canvas.request_draw(self.animate)  # Buffer a recursive call to start rendering loop.

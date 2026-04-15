@@ -4,7 +4,7 @@ import PySide6.QtCore
 import PySide6.QtGui
 
 from ..astro import conversions
-from ..dynamics import dcms
+from ..dynamics import dcms, quaternions
 
 
 class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
@@ -51,6 +51,11 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
             "y_velocity": ["", PySide6.QtWidgets.QLabel("—")],
             "z_velocity": ["", PySide6.QtWidgets.QLabel("—")],
         }
+        if self.sim.include_rotation:
+            self.state_values["roll"] = ["Roll (deg)", PySide6.QtWidgets.QLabel("—")]
+            self.state_values["pitch"] = ["Pitch (deg)", PySide6.QtWidgets.QLabel("—")]
+            self.state_values["yaw"] = ["Yaw (deg)", PySide6.QtWidgets.QLabel("—")]
+
         for value in self.state_values.values():
             value[1].setAlignment(PySide6.QtCore.Qt.AlignRight)
             state_form.addRow(value[0], value[1])
@@ -108,6 +113,16 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
             self.state_values["y_velocity"][1].setText(f"{velocity[1] / 1000:.3f}")
             self.state_values["z_velocity"][1].setText(f"{velocity[2] / 1000:.3f}")
 
+            # Update attitude.
+            if self.sim.include_rotation:
+                yaw, pitch, roll = dcms.quaternion_2_euler(
+                    quaternions.Quaternion(self.sim.splines["attitudes"][self.sim.focus](self.sim.sim_time)),
+                    "321"
+                )
+                self.state_values["roll"][1].setText(f"{np.rad2deg(roll):.3f}")
+                self.state_values["pitch"][1].setText(f"{np.rad2deg(pitch):.3f}")
+                self.state_values["yaw"][1].setText(f"{np.rad2deg(yaw):.3f}")
+
             # Update orbital elements.
             sm_axis, eccentricity, raan, inclination, argp, true_anomaly = (
                 conversions.state_2_classical(position, velocity, grav_param)
@@ -144,6 +159,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
 
             self.gt_values["longitude"][1].setText(f"{np.rad2deg(longitude):.3f}")
             self.gt_values["latitude"][1].setText(f"{np.rad2deg(latitude):.3f}")
+
         else:
             for value in self.state_values.values():
                 value[1].setText("—")
