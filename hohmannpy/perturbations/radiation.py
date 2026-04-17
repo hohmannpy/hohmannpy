@@ -3,9 +3,9 @@ from __future__ import annotations
 import numpy as np
 import scipy as sp
 
-from hohmannpy.dynamics import dcms
-from hohmannpy.astro import time, propagation
-from hohmannpy import spacecraft
+from ..dynamics import conversions
+from ..astro import time, propagation
+from .. import spacecraft
 from . import base
 
 
@@ -137,7 +137,7 @@ class SolarRadiation(base.Perturbation):
         # add the ECI position of the satellite to that to get the position of the satellite wrt. the Sun and then
         # finally invert this vector.
         earth_tilt = np.deg2rad(-23.439291115)
-        position_earth_wrt_sun = dcms.euler_2_dcm(earth_tilt, 1) @ self.earth_orbit_spline(time)
+        position_earth_wrt_sun = conversions.euler_2_dcm(earth_tilt, 1) @ self.earth_orbit_spline(time)
         position_sun_wrt_sat = -(position_earth_wrt_sun + state[:3])
 
         # Compute the solar pressure. We can get the irradiance by plugging the days since the Earth's last aphelion

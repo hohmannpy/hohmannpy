@@ -6,9 +6,9 @@ import functools
 import numpy as np
 import scipy as sp
 
-from hohmannpy.dynamics import dcms
-from hohmannpy.astro import propagation, time, orbits
-from hohmannpy import logging
+from ..dynamics import conversions
+from ..astro import propagation, time, orbits
+from .. import logging
 from . import base
 
 
@@ -294,7 +294,7 @@ class SolarGravity(ThirdBodyGravity):
             third_body=dummy_third_body,
             legendre=legendre,
             legendre_series_length=legendre_series_length,
-            dcm=dcms.euler_2_dcm(earth_tilt, 1)
+            dcm=conversions.euler_2_dcm(earth_tilt, 1)
         )
 
 

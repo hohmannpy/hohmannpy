@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ..dynamics import dcms
+from ..dynamics import conversions
 
 if TYPE_CHECKING:
     from .. import spacecraft
@@ -52,7 +52,7 @@ class Groundtrack:
                 raise AttributeError("The satellite must have its orbit propagated before generating a groundtrack.")
 
             # Convert position from ECI to ECEF frame.
-            position = dcms.euler_2_dcm(gmst, 3) @ position
+            position = conversions.euler_2_dcm(gmst, 3) @ position
 
             earth_radius = 6378.1363e3
             earth_eccentricity = 0.081819221456

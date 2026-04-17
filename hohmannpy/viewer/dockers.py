@@ -3,8 +3,9 @@ import PySide6.QtWidgets
 import PySide6.QtCore
 import PySide6.QtGui
 
-from ..astro import conversions
-from ..dynamics import dcms, quaternions
+from ..astro import conversions as a_conversions
+from ..dynamics import conversions as d_conversions
+from ..dynamics import quaternions
 
 
 class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
@@ -115,7 +116,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
 
             # Update attitude.
             if self.sim.include_rotation:
-                yaw, pitch, roll = dcms.quaternion_2_euler(
+                yaw, pitch, roll = d_conversions.quaternion_2_euler(
                     quaternions.Quaternion(self.sim.splines["attitudes"][self.sim.focus](self.sim.sim_time)),
                     "321"
                 )
@@ -125,7 +126,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
 
             # Update orbital elements.
             sm_axis, eccentricity, raan, inclination, argp, true_anomaly = (
-                conversions.state_2_classical(position, velocity, grav_param)
+                a_conversions.state_2_classical(position, velocity, grav_param)
             )
 
             self.ce_values["sm_axis"][1].setText(f"{sm_axis / 1000 :.3f}")
@@ -143,7 +144,7 @@ class PropertiesDocker(PySide6.QtWidgets.QDockWidget):
             earth_eccentricity = 0.081819221456
 
             gmst = self.sim.initial_global_time.gmst + earth_rot * self.sim.sim_time
-            position = dcms.euler_2_dcm(gmst, 3) @ position
+            position = d_conversions.euler_2_dcm(gmst, 3) @ position
             x = np.arctan2(position[2], np.sqrt(position[0] ** 2 + position[1] ** 2))
             x_old = 100
             while abs(x - x_old) > 1e-8:

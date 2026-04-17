@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 import scipy as sp
 
-from hohmannpy.dynamics import dcms
+from ..dynamics import conversions
 from . import base
 
 if TYPE_CHECKING:
-    from hohmannpy import spacecraft
+    from .. import spacecraft
 
 
 class NonSphericalEarth(base.Perturbation):
@@ -135,12 +135,12 @@ class NonSphericalEarth(base.Perturbation):
 
         # Use a DCM to convert back to rectilinear coordinates.
         curvilinear_accel = np.array([colatitudinal_accel, longitudinal_accel, radial_accel])
-        curvilinear_2_rectilinear = dcms.euler_2_dcm(longitude, 3).T @ dcms.euler_2_dcm(colatitude, 2).T
+        curvilinear_2_rectilinear = conversions.euler_2_dcm(longitude, 3).T @ conversions.euler_2_dcm(colatitude, 2).T
         acceleration = curvilinear_2_rectilinear @ curvilinear_accel
 
         # Acceleration is still fixed to the Earth, need to now convert to an inertial basis.
         gmst = self._initial_gmst + earth_rot * time
-        earth_2_inertial_dcm = dcms.euler_2_dcm(gmst, 3).T
+        earth_2_inertial_dcm = conversions.euler_2_dcm(gmst, 3).T
         acceleration = earth_2_inertial_dcm @ acceleration
 
         if len(state) == 3:
@@ -174,7 +174,7 @@ class NonSphericalEarth(base.Perturbation):
         gmst = self._initial_gmst + earth_rot * time
 
         # Transform position to the Earth-centered-Earth-fixed frame.
-        inertial_2_earth_dcm = dcms.euler_2_dcm(gmst, 3)
+        inertial_2_earth_dcm = conversions.euler_2_dcm(gmst, 3)
         position = inertial_2_earth_dcm @ position
 
         # Compute longitude and colatitude.
@@ -261,7 +261,7 @@ class J2(base.Perturbation):
 
         # Convert the position vector from the ECI to ECEF frame.
         gmst = self._initial_gmst + earth_rot * time
-        inertial_2_earth_dcm = dcms.euler_2_dcm(gmst, 3)
+        inertial_2_earth_dcm = conversions.euler_2_dcm(gmst, 3)
         position = inertial_2_earth_dcm @ state[:3]
 
         # Compute the J2 acceleration.

@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 import scipy as sp
 
-from hohmannpy.dynamics import dcms
+from ..dynamics import conversions
 from . import base
 
 if TYPE_CHECKING:
-    from hohmannpy import spacecraft
+    from .. import spacecraft
 
 
 # TODO: Add rotation to this.
@@ -132,7 +132,7 @@ class AtmosphericDrag(base.Perturbation):
         gmst = self._initial_gmst + earth_rot * time
 
         # Transform position to the Earth-centered-Earth-fixed frame and then compute the geodetic altitude.
-        inertial_2_earth_dcm = dcms.euler_2_dcm(gmst, 3)
+        inertial_2_earth_dcm = conversions.euler_2_dcm(gmst, 3)
         position = inertial_2_earth_dcm @ state[:3]
         altitude = self._compute_altitude(position)
 

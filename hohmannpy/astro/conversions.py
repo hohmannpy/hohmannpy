@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..dynamics import dcms
+from ..dynamics import conversions
 
 
 def classical_2_state(
@@ -63,11 +63,11 @@ def classical_2_state(
 
     # Now, transform them to the perifocal frame. For a 3-1-1 DCM using the RAAN, inclination, and argument of periapsis
     # and then invert it to get the local -> perifocal transformation.
-    local_2_perifocal_dcm = dcms.euler_2_dcm(true_anomaly, 3).T
+    local_2_perifocal_dcm = conversions.euler_2_dcm(true_anomaly, 3).T
     perifocal_2_inertial_dcm = (
-            dcms.euler_2_dcm(raan, 3).T
-            @ dcms.euler_2_dcm(inclination, 1).T
-            @ dcms.euler_2_dcm(argp, 3).T
+            conversions.euler_2_dcm(raan, 3).T
+            @ conversions.euler_2_dcm(inclination, 1).T
+            @ conversions.euler_2_dcm(argp, 3).T
     )
 
     position = perifocal_2_inertial_dcm @ local_2_perifocal_dcm @ position
@@ -230,11 +230,11 @@ def classical_2_state_p(
     position = np.array([pos_magnitude, 0, 0])
     velocity = np.array([pos_magnitude_dt, pos_magnitude * true_anomaly_dt, 0])
 
-    local_2_perifocal_dcm = dcms.euler_2_dcm(true_anomaly, 3).T
+    local_2_perifocal_dcm = conversions.euler_2_dcm(true_anomaly, 3).T
     perifocal_2_inertial_dcm = (
-            dcms.euler_2_dcm(raan, 3).T
-            @ dcms.euler_2_dcm(inclination, 1).T
-            @ dcms.euler_2_dcm(argp, 3).T
+            conversions.euler_2_dcm(raan, 3).T
+            @ conversions.euler_2_dcm(inclination, 1).T
+            @ conversions.euler_2_dcm(argp, 3).T
     )
 
     position = perifocal_2_inertial_dcm @ local_2_perifocal_dcm @ position
