@@ -98,10 +98,21 @@ class CowellPropagator(base.Propagator):
         # Append perturbing forces.
         if self._perturbing_forces is not None:
             for perturbing_force in self._perturbing_forces:
-                y3_perturb, y4_perturb, y5_perturb = perturbing_force.evaluate(t, y[:6], satellite)
+                if self._include_rotation:
+                    (
+                        y3_perturb, y4_perturb, y5_perturb, y10_perturb, y11_perturb, y12_perturb
+                    ) = perturbing_force.evaluate(t, y[:6], satellite)
+
+                    y10_dot += y10_perturb
+                    y11_dot += y11_perturb
+                    y12_dot += y12_perturb
+                else:
+                    y3_perturb, y4_perturb, y5_perturb = perturbing_force.evaluate(t, y[:6], satellite)
+
                 y3_dot += y3_perturb
                 y4_dot += y4_perturb
                 y5_dot += y5_perturb
+
 
         # Return state with or without rotation.
         if self._include_rotation:

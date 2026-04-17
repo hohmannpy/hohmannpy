@@ -79,7 +79,8 @@ class NonSphericalEarth(base.Perturbation):
         time : float
             Current time in seconds since propagation began.
         state : np.ndarray
-            Current translational state in ECI coordinates given as (position, velocity).
+            Current translational state in ECI coordinates given as (position, velocity) or
+            (position, velocity, quaternion, angular_velocity).
         satellite : :class:`~hohmannpy.astro.Satellite`
             Unused parameter simply based due to ``@abstractmethod`` requirements.
 
@@ -142,7 +143,10 @@ class NonSphericalEarth(base.Perturbation):
         earth_2_inertial_dcm = dcms.euler_2_dcm(gmst, 3).T
         acceleration = earth_2_inertial_dcm @ acceleration
 
-        return acceleration
+        if len(state) == 3:
+            return acceleration
+        else:
+            return np.concatenate((acceleration, np.zeros(3)), axis=-1)
 
     def _compute_colat_and_long(self, time, position):
         r"""
@@ -237,7 +241,8 @@ class J2(base.Perturbation):
         time : float
             Current time in seconds since propagation began.
         state : np.ndarray
-            Current translational state in ECI coordinates given as (position, velocity).
+            Current translational state in ECI coordinates given as (position, velocity) or
+            (position, velocity, quaternion, angular_velocity).
         satellite : :class:`~hohmannpy.astro.Satellite`
             Unused parameter simply based due to ``@abstractmethod`` requirements.
 
@@ -271,4 +276,7 @@ class J2(base.Perturbation):
         # Convert the acceleration vector from the ECEF back to the ECI frame.
         acceleration = inertial_2_earth_dcm.T @ acceleration
 
-        return acceleration
+        if len(state) == 3:
+            return acceleration
+        else:
+            return np.concatenate((acceleration, np.zeros(3)), axis=-1)

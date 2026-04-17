@@ -33,7 +33,8 @@ class Perturbation(ABC):
         time : float
             Current time in seconds since propagation began.
         state : np.ndarray
-            Current translational state in planet-centered inertial coordinates given as (position, velocity).
+            Current translational state in planet-centered inertial coordinates given as (position, velocity) or
+            (position, velocity, quaternion, angular_velocity).
         satellite : :class:`~hohmannpy.astro.Satellite`
             The satellite object experiencing the perturbing acceleration. It is passed so that attributes of the
             satellite can be used in computing perturbing acceleration, such as the ``ballistic_coeff`` by

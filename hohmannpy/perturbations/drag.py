@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from hohmannpy import spacecraft
 
 
+# TODO: Add rotation to this.
 class AtmosphericDrag(base.Perturbation):
     r"""
     Perturbation caused by drag due to Earth's atmosphere.
@@ -114,7 +115,8 @@ class AtmosphericDrag(base.Perturbation):
         time : float
             Current time in seconds since propagation began.
         state : np.ndarray
-            Current translational state in ECI coordinates given as (position, velocity).
+            Current translational state in ECI coordinates given as (position, velocity) or
+            (position, velocity, quaternion, angular_velocity).
         satellite : :class:`~hohmannpy.astro.Satellite`
             Satellite object. Passed so that its ``ballistic_coefficient`` may be accessed.
 
@@ -147,7 +149,10 @@ class AtmosphericDrag(base.Perturbation):
         # Compute perturbing acceleration.
         acceleration = -0.5 * 1 / satellite.ballistic_coeff * density * np.linalg.norm(velocity) * velocity
 
-        return acceleration
+        if len(state) == 3:
+            return acceleration
+        else:
+            return np.concatenate((acceleration, np.zeros(3)), axis=-1)
 
     def _compute_altitude(self, position: np.ndarray) -> float:
         """

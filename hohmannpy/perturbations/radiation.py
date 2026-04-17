@@ -9,6 +9,7 @@ from hohmannpy import spacecraft
 from . import base
 
 
+# TODO: Add rotation to this.
 class SolarRadiation(base.Perturbation):
     r"""
     Perturbation caused by solar radiation from the Sun.
@@ -79,7 +80,7 @@ class SolarRadiation(base.Perturbation):
         """
 
         # Get a spline corresponding to the Earth's orbit.
-        from .. import celestial  # Stuffed down here to prevent circular imports.
+        from ..astro import celestial  # Stuffed down here to prevent circular imports.
         earth = celestial.Earth(initial_global_time)
 
         propagator = propagation.KeplerPropagator()
@@ -116,7 +117,8 @@ class SolarRadiation(base.Perturbation):
         time : float
             Current time in seconds since propagation began.
         state : np.ndarray
-            Current translational state in ECI coordinates given as (position, velocity).
+            Current translational state in ECI coordinates given as (position, velocity) or
+            (position, velocity, quaternion, angular_velocity).
         satellite : :class:`~hohmannpy.astro.Satellite`
             Satellite object. Passed so that its ``mass``, ``mean_reflective_area``, and ``reflectivity`` may be
             accessed.
@@ -168,4 +170,7 @@ class SolarRadiation(base.Perturbation):
                 * position_sun_wrt_sat / np.linalg.norm(position_sun_wrt_sat)
         )
 
-        return acceleration
+        if len(state) == 3:
+            return acceleration
+        else:
+            return np.concatenate((acceleration, np.zeros(3)), axis=-1)

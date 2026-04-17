@@ -144,7 +144,8 @@ class ThirdBodyGravity(base.Perturbation):
         time : float
             Current time in seconds since propagation began.
         state : np.ndarray
-            Current translational state in ECI coordinates given as (position, velocity).
+            Current translational state in planet-centered inertial coordinates given as (position, velocity) or
+            (position, velocity, quaternion, angular_velocity).
         satellite : :class:`~hohmannpy.astro.Satellite`
             Unused parameter simply based due to ``@abstractmethod`` requirements.
 
@@ -189,7 +190,10 @@ class ThirdBodyGravity(base.Perturbation):
                 )
             )
 
-        return acceleration
+        if len(state) == 3:
+            return acceleration
+        else:
+            return np.concatenate((acceleration, np.zeros(3)), axis=-1)
 
 
 class LunarGravity(ThirdBodyGravity):
@@ -226,7 +230,7 @@ class LunarGravity(ThirdBodyGravity):
             legendre_series_length: int = 10,
     ):
         # Initialize the Moon.
-        from .. import celestial  # Stuffed down here to prevent circular imports.
+        from ..astro import celestial  # Stuffed down here to prevent circular imports.
         moon = celestial.Moon(initial_true_anomaly)
 
         super().__init__(
@@ -277,7 +281,7 @@ class SolarGravity(ThirdBodyGravity):
         # Our actually third body is the Earth but to instantiate it we need the initial global time (so we can locate
         # the Earth on its orbit). That isn't passed in till finalize__init__() is called so create a temporary dummy
         # third body. We'll replace it with the Earth in the aforementioned function.
-        from ... import spacecraft  # Stuffed down here to prevent circular imports.
+        from .. import spacecraft  # Stuffed down here to prevent circular imports.
         dummy_third_body = spacecraft.Satellite(
             starting_orbit=orbits.Orbit(
                 position=np.array([1, 1, 1]),
@@ -310,7 +314,7 @@ class SolarGravity(ThirdBodyGravity):
         """
 
         # Initialize the Earth.
-        from .. import celestial  # Stuffed down here to prevent circular imports.
+        from ..astro import celestial  # Stuffed down here to prevent circular imports.
         earth = celestial.Earth(initial_global_time)
         self.third_body = earth
 
