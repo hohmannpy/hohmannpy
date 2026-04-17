@@ -5,8 +5,7 @@ from . import quaternions
 import numpy as np
 
 if TYPE_CHECKING:
-    from ..astro import perturbations
-    from .. import spacecraft
+    from .. import spacecraft, perturbations
 
 
 class Orientation:

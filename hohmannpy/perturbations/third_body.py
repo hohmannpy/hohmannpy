@@ -6,9 +6,9 @@ import functools
 import numpy as np
 import scipy as sp
 
-from ...dynamics import dcms
-from .. import propagation, time, orbits
-from ... import logging
+from hohmannpy.dynamics import dcms
+from hohmannpy.astro import propagation, time, orbits
+from hohmannpy import logging
 from . import base
 
 

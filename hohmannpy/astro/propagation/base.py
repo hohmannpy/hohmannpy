@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING, Optional
 from abc import ABC, abstractmethod
 
 import numpy as np
-from ... import logging
+from ... import logging, perturbations
 
 if TYPE_CHECKING:
-    from .. import perturbations, maneuvers
+    from .. import maneuvers
     from ... import spacecraft
 
 
@@ -33,7 +33,7 @@ class Propagator(ABC):
         self._step_size = step_size
 
         self.satellites: Optional[dict[str, spacecraft.Satellite]] = None
-        self._perturbing_forces: Optional[list[perturbations.base.Perturbation]] = None
+        self._perturbing_forces: Optional[list[hohmannpy.perturbations.base.Perturbation]] = None
         self._timesteps: Optional[int] = None  # How many discrete time points to propagate at.
 
         self._active_burns: dict[str, list[maneuvers.ContinuousBurn]] = {}

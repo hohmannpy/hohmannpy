@@ -4,11 +4,9 @@ from typing import Any, Union, Callable, Optional, TYPE_CHECKING
 import numpy as np
 import scipy as sp
 
-from . import perturbations
-
 if TYPE_CHECKING:
     from . import time
-    from .. import spacecraft
+    from .. import spacecraft, perturbations
 
 
 class ImpulsiveBurn:

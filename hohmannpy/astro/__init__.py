@@ -14,9 +14,6 @@ from .conversions import (
 )
 
 # Perturbations.
-from .perturbations import (
-    Perturbation, NonSphericalEarth, AtmosphericDrag, J2, ThirdBodyGravity, LunarGravity, SolarGravity, SolarRadiation
-)
 
 # Other libraries
 from .celestial import Earth, Moon

@@ -3,12 +3,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ...dynamics import dcms
-from ...astro import perturbations
-
 if TYPE_CHECKING:
-    from ... import spacecraft
+    from hohmannpy import spacecraft, perturbations
 
+
+# TODO: This class.
 class GravityGradient(perturbations.Perturbation):
     def __init__(self):
         super().__init__()

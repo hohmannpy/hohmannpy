@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from ... import spacecraft
+    from hohmannpy import spacecraft
 
 
 class Perturbation(ABC):

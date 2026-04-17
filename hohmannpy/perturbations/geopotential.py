@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 import scipy as sp
 
-from ...dynamics import dcms
+from hohmannpy.dynamics import dcms
 from . import base
 
 if TYPE_CHECKING:
-    from ... import spacecraft
+    from hohmannpy import spacecraft
 
 
 class NonSphericalEarth(base.Perturbation):

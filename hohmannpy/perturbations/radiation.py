@@ -3,9 +3,9 @@ from __future__ import annotations
 import numpy as np
 import scipy as sp
 
-from ...dynamics import dcms
-from .. import time, propagation
-from ... import spacecraft
+from hohmannpy.dynamics import dcms
+from hohmannpy.astro import time, propagation
+from hohmannpy import spacecraft
 from . import base
 
 

@@ -8,9 +8,10 @@ import time as python_time
 import pandas as pd
 import numpy as np
 
-from hohmannpy.astro import propagation, perturbations, time, maneuvers
+from hohmannpy.astro import propagation, time, maneuvers
 from hohmannpy.logging import logging
 from hohmannpy import spacecraft
+import hohmannpy.perturbations as perturbations
 from hohmannpy.viewer import viewing
 
 
@@ -38,11 +39,9 @@ class Mission:
         :meth:`simulate()` has been called, these values can also be accessed as attributes of each ``Satellite``.
     propagator : :class:`~hohmannpy.astro.Propagator`
         Propagation technique to use to simulate the orbits of each ``Satellite``.
-    perturbing_forces : list[:class:`~hohmannpy.astro.Perturbation`]
+    perturbing_forces : list[:class:`~hohmannpy.perturbations.Perturbation`]
         Perturbations to add to the mission to increase the fidelity of orbital simulation. Note that if any are added
         a non-Keplerian propagator such as :class:`~hohmannpy.astro.CowellPropagator` must be used.
-    perturbing_torques : list[:class:`~hohmannpy.astro.Perturbation`]
-        Perturbations to add to the mission to increase the fidelity of rotational simulation.
     verbose: bool
         Whether to print information about propagation.
     cores : int
@@ -290,7 +289,8 @@ class Mission:
             print(f"\nPropagation complete in {end_time - start_time:.2f} seconds!")
 
     @staticmethod
-    def _parallel_propagate(args: tuple[propagation.Propagator, dict[str, spacecraft.Satellite], float, list[perturbations.Perturbation]]) -> None:
+    def _parallel_propagate(args: tuple[propagation.Propagator, dict[str, spacecraft.Satellite], float, list[
+        perturbations.Perturbation]]) -> None:
         r"""
         Parallel processing helper function.
 

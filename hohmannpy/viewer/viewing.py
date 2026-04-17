@@ -15,10 +15,11 @@ from . import rendering, toolbars, dockers, tables
 #   - (Post-alpha) Hovering over satellite displays name, clicking focuses it.
 #   - (Post-alpha) FPS tracking on all tabs.
 #   - (Post-alpha) Add an option to display the ECI basis in the orbit viewer and latitude and longitude lines in the
-#       groundtrack viewer. Also add a visible Sun on screen.
-#   - (Post-alpha) The groundtrack renderer is still a little laggy. Work on ways to improve this.
-#   - (Post-alpha) Laggy when a long trajectory is rendered, need to make step size more dynamic.
-#   - (Post-alpha) Redo variables and docs to use privatization.
+#       groundtrack viewer.
+#   - (Post-beta) Add a visible Sun on screen and have the Earth move around it..
+#   - (Post-beta) The groundtrack renderer is still a little laggy. Work on ways to improve this.
+#   - (Post-beta) Laggy when a long trajectory is rendered, need to make step size more dynamic.
+#   - (Post-beta) Redo variables and docs to use privatization.
 #   - (Post-beta) Fix spacecraft not being shadowed when in eclipse by turning off lighting.
 class Viewer(PySide6.QtWidgets.QMainWindow):
     """
