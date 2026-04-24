@@ -8,7 +8,7 @@ import scipy as sp
 
 from ..dynamics import conversions
 from ..astro import propagation, time, orbits
-from .. import logging
+from .. import logging, spacecraft
 from . import base
 
 
